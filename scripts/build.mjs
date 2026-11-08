@@ -3,7 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES, CONTRIB_PROPERTY, CONTRIBUTEURS } from "./config.js";
+import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES, CONTRIB_PROPERTY, CONTRIBUTEURS, FORMULAIRES } from "./config.js";
 
 const OUT = path.resolve(process.argv[2] || "site/data");
 const TOKEN = process.env.NOTION_TOKEN;
@@ -344,6 +344,8 @@ const graph = {
   generated: new Date().toISOString(),
   bases: BASES.map(b => ({ key: b.key, label: b.label, one: b.one, color: b.color, count: list.filter(x => x.type === b.key).length })),
   nodes: list, edges: E, conf: [...conf.values()], comms, stats,
+  // Seuls des liens https sont acceptés pour les formulaires
+  forms: Object.fromEntries(Object.entries(FORMULAIRES).filter(([, u]) => /^https:\/\/[^\s"'<>]+$/.test(u || ""))),
 };
 // Publication : identifiants Notion remplacés par les identifiants publics
 const pubGraph = {

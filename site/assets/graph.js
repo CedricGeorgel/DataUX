@@ -359,6 +359,13 @@ function init(G) {
     return x < v.x0 + 20 || x > v.x1 - 20 || y < v.y0 + 20 || y > v.y1 - 20;
   }
 
+  // Lien vers un formulaire avec ses champs pré-remplis
+  function formUrl(base, params) {
+    const u = new URL(base);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    return u.toString();
+  }
+
   // ---------- Panneau (page complète)
   const panel = FULL ? $("panel") : null;
   const item = (n, extra = "") => `<li><span class="sw" style="background:${color(n)}"></span><button class="lnk" data-id="${n.id}">${esc(n.name)}</button>${extra}</li>`;
@@ -385,6 +392,7 @@ function init(G) {
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
+        ${G.forms && G.forms.proposition ? `<h2>Contribuer</h2><p class="muted">Une notion manque ? Propose-la, elle sera relue avant d'être ajoutée.</p><div class="acts"><a class="btn" href="${esc(formUrl(G.forms.proposition, {}))}" target="_blank" rel="noopener noreferrer">Proposer une fiche ou une base</a></div>` : ""}
         <p class="legend" style="margin-top:18px">Données Notion du ${esc(when)}. Mise à jour automatique toutes les heures.</p>`;
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
@@ -430,7 +438,12 @@ function init(G) {
     const props = j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
     const body = j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`;
     const who = j.contributors && j.contributors.length ? j.contributors.map(esc).join(", ") : `<span class="muted">Personne pour l'instant</span>`;
-    wBody.innerHTML = props + body + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p></div>`;
+    const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.id;
+    const acts = [
+      F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
+      F.proposition ? `<a class="btn" href="${esc(formUrl(F.proposition, { liee: n.name }))}" target="_blank" rel="noopener noreferrer">Proposer une fiche liée</a>` : "",
+    ].join("");
+    wBody.innerHTML = props + body + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p>${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
     wBody.scrollTop = 0;
     wBody.querySelectorAll("[data-id]").forEach(b => {
       if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true);
