@@ -26,16 +26,15 @@
       </div>
     </div>
   </div>
-  <button class="btn" id="panelBtn" aria-expanded="true" aria-controls="panel" style="margin-left:auto">Masquer le panneau</button>
 </div>
+<button class="chev" id="panelBtn" aria-expanded="true" aria-controls="panel" aria-label="Masquer le panneau" title="Masquer le panneau"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 <aside id="panel" aria-live="polite"></aside>
-<section class="win" id="win" role="dialog" aria-label="Contenu de la fiche">
-  <div class="whead">
-    <span class="sw"></span><span class="wt"></span>
-    <button class="ib" data-collapse aria-expanded="true" aria-label="Replier la fiche" title="Replier">▾</button>
-    <button class="ib" data-close aria-label="Fermer la fiche" title="Fermer">✕</button>
+<section class="win fiche-win open collapsed" id="win" aria-label="Fiche">
+  <div class="whead" data-toggle>
+    <span class="sw"></span><span class="wt">Fiche</span>
+    <button class="ib" data-collapse aria-expanded="false" aria-controls="ficheBody" aria-label="Déplier la fiche" title="Déplier">▸</button>
   </div>
-  <div class="wbody"></div>
+  <div class="wbody" id="ficheBody"><p class="muted">Clique sur un point pour lire sa fiche.</p></div>
 </section>
 <section class="win legend-win open" id="legendWin" aria-label="Légende">
   <div class="whead">

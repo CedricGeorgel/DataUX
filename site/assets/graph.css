@@ -5,7 +5,7 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1
 #graph{position:fixed;inset:0}
 svg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 svg:active{cursor:grabbing}
-.bar{position:fixed;top:12px;left:12px;right:372px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;z-index:3}
+.bar{position:fixed;top:12px;left:12px;right:420px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;z-index:3}
 .fwrap{position:relative}
 .pop{position:absolute;top:calc(100% + 6px);left:0;width:min(560px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);
  border-radius:10px;padding:12px 14px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.18);z-index:5}
@@ -14,7 +14,7 @@ svg:active{cursor:grabbing}
 .pop h4+.row{margin-bottom:10px}
 .row{display:flex;flex-wrap:wrap;gap:6px}
 body.nopanel aside{display:none}
-body.nopanel .bar{right:12px}
+body.nopanel .bar{right:60px}
 .bar input{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);width:220px}
 .chip,.btn{font:inherit;font-size:12px;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
  border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;user-select:none;text-decoration:none}
@@ -78,7 +78,7 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .win{position:fixed;left:12px;top:60px;width:420px;max-width:calc(100vw - 24px);height:min(62vh,640px);display:none;flex-direction:column;
  background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.2);z-index:6;overflow:hidden}
 .win.open{display:flex}
-.win.collapsed{height:auto!important}
+.win.collapsed{height:auto!important;resize:none}
 .win.collapsed .wbody{display:none}
 .whead{display:flex;align-items:center;gap:8px;padding:9px 10px 9px 14px;border-bottom:1px solid var(--line);cursor:move;user-select:none;touch-action:none}
 .win.collapsed .whead{border-bottom:0}
@@ -115,6 +115,22 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .skel{height:12px;border-radius:6px;background:var(--line);margin:10px 0;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.5}}
 
+/* Fiche : barre sous la recherche, dépliée au clic sur un point, redimensionnable */
+.fiche-win{left:12px;top:56px;width:420px;height:min(62vh,640px);min-width:280px;min-height:180px;max-height:calc(100vh - 68px);resize:both;z-index:6}
+.fiche-win.collapsed{min-height:0}
+.fiche-win .whead{cursor:pointer}
+.fiche-win.collapsed .wt{color:var(--muted);font-weight:500}
+.fiche-win.empty .sw{display:none}
+
+/* Chevron du panneau */
+.chev{position:fixed;top:14px;right:372px;z-index:4;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;
+ border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.chev:hover{border-color:var(--muted)}
+.chev:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.chev svg{transition:transform .2s ease}
+body.nopanel .chev{right:12px}
+body.nopanel .chev svg{transform:rotate(180deg)}
+
 /* Contributeurs en bas de fiche */
 .wbody .contrib{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
 .wbody .contrib h4{margin:0 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
@@ -138,7 +154,11 @@ ul.leg .dot{width:10px;height:10px;border-radius:50%;flex:none;margin:0 5px}
   aside{top:auto;height:45%;left:12px;width:auto}
   .bar{right:12px}.bar input{width:150px}
   .win{left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;height:70vh}
-  .legend-win{left:8px!important;right:auto!important;top:56px!important;bottom:auto;width:200px;height:auto}
+  .fiche-win{top:52px!important;bottom:auto;width:auto!important;height:55vh!important;resize:none}
+  .legend-win{left:8px!important;right:auto!important;top:auto!important;bottom:calc(45% + 20px)!important;width:200px;height:auto}
+  .chev{top:auto;bottom:calc(45% + 20px);right:12px}
+  body.nopanel .chev{bottom:12px}
+  .bar{right:12px}
   .whead{cursor:default}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

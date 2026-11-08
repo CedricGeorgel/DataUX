@@ -2,11 +2,17 @@
 // Lancé par GitHub Actions. Le token vient du secret NOTION_TOKEN et n'est jamais écrit dans le site.
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES, CONTRIB_PROPERTY, CONTRIBUTEURS } from "./config.js";
 
 const OUT = path.resolve(process.argv[2] || "site/data");
 const TOKEN = process.env.NOTION_TOKEN;
 if (!TOKEN) { console.error("NOTION_TOKEN manquant (Settings › Secrets and variables › Actions)."); process.exit(1); }
+
+// Les identifiants Notion ne sont jamais publiés : chaque fiche reçoit un identifiant public,
+// calculé à partir de son identifiant Notion et d'un secret. On ne peut pas revenir en arrière.
+const SALT = process.env.PUBLIC_ID_SALT || TOKEN;
+const pub = id => createHash("sha256").update(SALT + ":" + id).digest("hex").slice(0, 16);
 
 // ---------------------------------------------------------------- API Notion (environ 3 appels par seconde)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -231,7 +237,7 @@ function blocksHtml(blocks, imgs) {
       case "equation": h += `<pre class="eq">${esc(v.expression)}</pre>`; break;
       case "image": { const src = fileUrl(v);
         // L'image est copiée dans le site (les liens Notion expirent après 1 h)
-        if (/^https:\/\//i.test(src)) { const k = imgs.length; imgs.push({ src, id: nid(b.id) });
+        if (/^https:\/\//i.test(src)) { const k = imgs.length; imgs.push({ src, id: pub(nid(b.id)) });
           const cap = richHtml(v.caption);
           h += `<!--img${k}--><figure><img src="@@IMG${k}@@" alt="${esc(plain(v.caption))}" loading="lazy">${cap ? `<figcaption>${cap}</figcaption>` : ""}</figure><!--/img${k}-->`; }
         break; }
@@ -291,6 +297,13 @@ async function fiche(id, page, contributors) {
 
 // ---------------------------------------------------------------- Génération
 const t0 = Date.now();
+// Numéro de version dans les pages : après chaque publication, les navigateurs rechargent le code
+const V = (process.env.GITHUB_SHA || String(Date.now())).slice(0, 8);
+for (const f of ["index.html", "embed.html"]) {
+  const file = path.join(OUT, "..", f);
+  const html = await fs.readFile(file, "utf8").catch(() => null);
+  if (html) await fs.writeFile(file, html.replace(/(assets\/[\w.-]+\.(?:js|css))(\?v=[\w]+)?/g, `$1?v=${V}`));
+}
 await fs.rm(OUT, { recursive: true, force: true });
 await fs.mkdir(path.join(OUT, "fiches"), { recursive: true });
 await fs.mkdir(path.join(OUT, "img"), { recursive: true });
@@ -332,13 +345,30 @@ const graph = {
   bases: BASES.map(b => ({ key: b.key, label: b.label, one: b.one, color: b.color, count: list.filter(x => x.type === b.key).length })),
   nodes: list, edges: E, conf: [...conf.values()], comms, stats,
 };
-await fs.writeFile(path.join(OUT, "graph.json"), JSON.stringify(graph));
+// Publication : identifiants Notion remplacés par les identifiants publics
+const pubGraph = {
+  ...graph,
+  nodes: list.map(x => ({ ...x, id: pub(x.id) })),
+  edges: graph.edges.map(([a, b]) => [pub(a), pub(b)]),
+  conf: graph.conf.map(([a, b]) => [pub(a), pub(b)]),
+  comms: comms.map(c => ({ ...c, top: c.top.map(pub) })),
+};
+await fs.writeFile(path.join(OUT, "graph.json"), JSON.stringify(pubGraph));
 console.log(`Graphe : ${list.length} fiches, ${E.length} liens, ${graph.conf.length} confusions, ${comms.length} groupes`);
 
 let n = 0, failed = 0;
 for (const [id, page] of pages) {
   const who = [...new Set((contrib.get(id) || []).map(c => people.get(c)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
-  try { await fs.writeFile(path.join(OUT, "fiches", id + ".json"), JSON.stringify(await fiche(id, page, who))); }
+  try {
+    const f = await fiche(id, page, who);
+    f.id = pub(id);
+    // Liens vers d'autres fiches : identifiant public. Liens vers une page hors des 8 bases : simple texte.
+    f.html = f.html.replace(/<button class="lnk" data-id="([0-9a-f]{32})">([\s\S]*?)<\/button>/g,
+      (m, pid, inner) => nodes.has(pid) ? `<button class="lnk" data-id="${pub(pid)}">${inner}</button>` : inner);
+    f.props = f.props.map(p => ({ ...p, html: p.html.replace(/<button class="lnk" data-id="([0-9a-f]{32})">([\s\S]*?)<\/button>/g,
+      (m, pid, inner) => nodes.has(pid) ? `<button class="lnk" data-id="${pub(pid)}">${inner}</button>` : inner) }));
+    await fs.writeFile(path.join(OUT, "fiches", pub(id) + ".json"), JSON.stringify(f));
+  }
   catch (e) { failed++; console.warn("Fiche non générée :", nodes.get(id).name, e.message); }
   if (++n % 50 === 0) console.log(`${n}/${pages.size} fiches`);
 }

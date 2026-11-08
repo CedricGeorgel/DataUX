@@ -70,7 +70,8 @@ function init(G) {
     document.addEventListener("click", e => { if (pop.classList.contains("open") && !pop.contains(e.target) && !filterBtn.contains(e.target)) closePop(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) { closePop(); filterBtn.focus(); } });
     const panelBtn = $("panelBtn");
-    panelBtn.onclick = () => { const closed = document.body.classList.toggle("nopanel"); panelBtn.textContent = closed ? "Afficher le panneau" : "Masquer le panneau"; panelBtn.setAttribute("aria-expanded", !closed); if (!state.focus) fitNodes(visNodes, 1.2, 400); };
+    panelBtn.onclick = () => { const closed = document.body.classList.toggle("nopanel"); const l = closed ? "Afficher le panneau" : "Masquer le panneau";
+      panelBtn.setAttribute("aria-label", l); panelBtn.title = l; panelBtn.setAttribute("aria-expanded", !closed); if (!state.focus) fitNodes(visNodes, 1.2, 400); };
     chips = $("chips");
     typeKeys.forEach(t => {
       const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
@@ -333,7 +334,7 @@ function init(G) {
     if (id) { const n = byId.get(id);
       if (!state.types.has(n.type)) { state.types.add(n.type); if (chips) [...chips.children][typeKeys.indexOf(n.type)].classList.remove("off"); }
       if (n.deg === 0 && !state.showIso && !(state.showSug && n.sug.size)) isoBtn.click(); else update();
-      if (FULL && id && win.classList.contains("open")) loadFiche(id);
+      if (FULL) { setCollapsed(false); loadFiche(id); }
       const v = viewArea();
       if (state.ring) {
         const box = buildRing(n);
@@ -344,7 +345,7 @@ function init(G) {
         if (center || offscreen(n, v)) { const k = Math.max(1.2, d3.zoomTransform(svg.node()).k);
           svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(v.cx - n.x * k, v.cy - n.y * k).scale(k)); }
       }
-    } else { highlight(); placeLabels(); sim.alpha(.4).restart(); }
+    } else { highlight(); placeLabels(); sim.alpha(.4).restart(); if (FULL) resetFiche(); }
     labelVis(d3.zoomTransform(svg.node()).k);
     if (bigLink) bigLink.href = BIG + (id ? "#" + id : "");
     if (FULL) {
@@ -368,7 +369,6 @@ function init(G) {
       let h = `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
         <h1 style="margin-top:12px">${esc(n.name)}</h1>
         <p><span class="tag" style="border-color:${color(n)}">${esc(TYPES[n.type].label)}</span>${n.cat ? `<span class="tag">${esc(n.cat)}</span>` : ""}</p>
-        <div class="acts"><button class="btn" data-read="${n.id}">Lire la fiche</button></div>
         <h2>${n.deg} lien${n.deg > 1 ? "s" : ""}</h2>`;
       if (!n.deg) h += `<p class="muted">Aucune relation logique. Cette fiche n'est reliée à rien.</p>`;
       typeKeys.forEach(t => { if (groups[t]) h += `<h3>${esc(TYPES[t].label)} · ${groups[t].length}</h3><ul class="links">${groups[t].sort((a, b) => b.deg - a.deg).map(m => item(m)).join("")}</ul>`; });
@@ -389,26 +389,24 @@ function init(G) {
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
     panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
-    panel.querySelectorAll("[data-read]").forEach(b => b.onclick = () => openWin(b.dataset.read));
     const bk = panel.querySelector("[data-back]"); if (bk) bk.onclick = () => select(null);
   }
 
-  // ---------- Fenêtre de fiche : déplaçable, repliable, suit la fiche sélectionnée
+  // ---------- Fiche : barre repliée sous la recherche. Un clic sur un point la déplie avec le contenu de la fiche.
   const win = FULL ? $("win") : document.createElement("div");
   const wTitle = FULL && win.querySelector(".wt"), wSw = FULL && win.querySelector(".sw"), wBody = FULL && win.querySelector(".wbody");
-  const wCol = FULL && win.querySelector("[data-collapse]"), wClose = FULL && win.querySelector("[data-close]");
+  const wCol = FULL && win.querySelector("[data-collapse]");
   const ficheCache = new Map(); let ficheReq = null, shown = null;
-  function openWin(id) { win.classList.add("open"); setCollapsed(false); placeWin(); loadFiche(id); wClose.focus({ preventScroll: true });
-    const n = byId.get(id); if (n && offscreen(n, viewArea())) select(id, true, state.ring); }
-  function closeWin() { win.classList.remove("open"); shown = null; const b = panel.querySelector("[data-read]"); if (b) b.focus(); }
-  function setCollapsed(c) { win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); wCol.setAttribute("aria-label", c ? "Déplier la fiche" : "Replier la fiche"); wCol.textContent = c ? "▸" : "▾"; store.set("reseau-win-collapsed", c); }
-  function placeWin() {
-    const p = store.get("reseau-win-pos");
-    if (p && innerWidth > 760) { win.style.left = Math.min(Math.max(0, p.x), innerWidth - 120) + "px"; win.style.top = Math.min(Math.max(0, p.y), innerHeight - 44) + "px"; }
+  function setCollapsed(c) { if (!FULL) return; win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); const l = c ? "Déplier la fiche" : "Replier la fiche"; wCol.setAttribute("aria-label", l); wCol.title = l; wCol.textContent = c ? "▸" : "▾"; }
+  function resetFiche() {
+    shown = null; if (ficheReq) ficheReq.abort();
+    win.classList.add("empty"); wTitle.textContent = "Fiche";
+    wBody.innerHTML = `<p class="muted">Clique sur un point pour lire sa fiche.</p>`;
+    setCollapsed(true);
   }
   async function loadFiche(id) {
     const n = byId.get(id); if (!n || shown === id) return; shown = id;
-    wTitle.textContent = n.name; wSw.style.background = color(n);
+    win.classList.remove("empty"); wTitle.textContent = n.name; wSw.style.background = color(n);
     if (ficheCache.has(id)) return renderFiche(ficheCache.get(id));
     wBody.innerHTML = `<div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div>`;
     wBody.setAttribute("aria-busy", "true");
@@ -440,12 +438,15 @@ function init(G) {
     });
   }
   if (FULL) {
-    wClose.onclick = closeWin;
-    wCol.onclick = () => setCollapsed(!win.classList.contains("collapsed"));
-    if (store.get("reseau-win-collapsed")) setCollapsed(true);
-    win.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); closeWin(); } });
-    draggable(win, "reseau-win-pos");
-    win.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setCollapsed(!win.classList.contains("collapsed")); });
+    win.classList.add("empty");
+    win.querySelector(".whead").addEventListener("click", () => setCollapsed(!win.classList.contains("collapsed")));
+    win.addEventListener("keydown", e => { if (e.key === "Escape" && !win.classList.contains("collapsed")) { e.stopPropagation(); setCollapsed(true); wCol.focus(); } });
+    // Taille choisie en tirant le coin bas-droit : gardée pour la prochaine visite
+    const size = store.get("reseau-fiche-size");
+    if (size && innerWidth > 760) { win.style.width = Math.min(size.w, innerWidth - 24) + "px"; win.style.height = Math.min(size.h, innerHeight - 68) + "px"; }
+    if (window.ResizeObserver) new ResizeObserver(() => {
+      if (!win.classList.contains("collapsed") && innerWidth > 760) store.set("reseau-fiche-size", { w: win.offsetWidth, h: win.offsetHeight });
+    }).observe(win);
   }
   // Une fenêtre se déplace en tirant sa barre de titre ; sa position est gardée
   function draggable(el, key) {
@@ -489,6 +490,6 @@ function init(G) {
   fitNodes(visNodes, 1.2, 0);
   addEventListener("resize", () => { if (!state.focus) fitNodes(visNodes, 1.2, 0); });
   const deep = location.hash.slice(1).replace(/-/g, "").toLowerCase();
-  if (deep && byId.has(deep)) { select(deep, true); if (FULL) openWin(deep); }
+  if (deep && byId.has(deep)) select(deep, true);
 }
 })();
