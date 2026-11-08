@@ -115,6 +115,21 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .skel{height:12px;border-radius:6px;background:var(--line);margin:10px 0;animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.5}}
 
+/* Contributeurs en bas de fiche */
+.wbody .contrib{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.wbody .contrib h4{margin:0 0 4px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.wbody .contrib p{margin:0}
+
+/* Légende */
+.legend-win{left:auto;right:372px;top:auto;bottom:12px;width:230px;height:auto;max-height:70vh;z-index:5}
+body.nopanel .legend-win{right:12px}
+.legend-win .wbody{padding:10px 14px 12px;font-size:12.5px}
+ul.leg{list-style:none;margin:0;padding:0}
+ul.leg li{display:flex;align-items:center;gap:8px;padding:2px 0}
+ul.leg.help{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);color:var(--muted)}
+ul.leg .swl{margin:0;width:20px;flex:none;border-top-width:2px}
+ul.leg .dot{width:10px;height:10px;border-radius:50%;flex:none;margin:0 5px}
+
 /* Page « nuage seul » pour Notion */
 .embed .open-big{position:fixed;top:10px;right:10px;z-index:4}
 .embed .hint{position:fixed;left:10px;bottom:8px;font-size:11px;color:var(--muted);z-index:4;pointer-events:none}
@@ -123,6 +138,7 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
   aside{top:auto;height:45%;left:12px;width:auto}
   .bar{right:12px}.bar input{width:150px}
   .win{left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;height:70vh}
+  .legend-win{left:8px!important;right:auto!important;top:56px!important;bottom:auto;width:200px;height:auto}
   .whead{cursor:default}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

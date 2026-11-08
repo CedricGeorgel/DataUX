@@ -2,7 +2,7 @@
 // Lancé par GitHub Actions. Le token vient du secret NOTION_TOKEN et n'est jamais écrit dans le site.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES } from "./config.js";
+import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES, CONTRIB_PROPERTY, CONTRIBUTEURS } from "./config.js";
 
 const OUT = path.resolve(process.argv[2] || "site/data");
 const TOKEN = process.env.NOTION_TOKEN;
@@ -35,7 +35,6 @@ const nid = id => String(id || "").replace(/-/g, "").toLowerCase();
 const plain = rich => (rich || []).map(r => r.plain_text || "").join("").trim();
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const safeUrl = u => /^(https?:\/\/|mailto:)/i.test(u || "");
-const notionUrl = (u, id) => /^https:\/\/([a-z0-9-]+\.)*notion\.(so|site|com)\//i.test(u || "") ? u : "https://www.notion.so/" + id;
 function propText(p) {
   switch (p && p.type) {
     case "title": return plain(p.title);
@@ -70,7 +69,7 @@ async function relationIds(pageId, prop) {
   } while (cursor);
   return ids;
 }
-async function readBase(base, pages) {
+async function readBase(base, pages, contrib) {
   const src = await sourceId(base);
   const nodes = [], rels = [];
   let cursor = null;
@@ -83,13 +82,14 @@ async function readBase(base, pages) {
       for (const [pname, p] of Object.entries(page.properties || {})) {
         if (p.type === "title") name = plain(p.title);
         if (pname === base.cat) cat = propText(p);
+        if (p.type === "relation" && pname === CONTRIB_PROPERTY) contrib.set(id, await relationIds(page.id, p));
         if (p.type === "relation" && !IGNORE.includes(pname)) {
           const kind = pname === CONFUSION ? "conf" : "link";
           for (const t of await relationIds(page.id, p)) rels.push([id, t, kind]);
         }
       }
       if (!name) continue;
-      nodes.push({ id, name, type: base.key, cat, url: notionUrl(page.url, id) });
+      nodes.push({ id, name, type: base.key, cat });
       pages.set(id, page);
     }
     cursor = r.has_more ? r.next_cursor : null;
@@ -269,7 +269,7 @@ async function saveImage(img) {
   } catch (e) { return null; }
 }
 const SKIP = new Set(["title", "relation", "rollup", "formula", "created_time", "last_edited_time", "created_by", "last_edited_by", "people", "files", "button", "unique_id", "verification"]);
-async function fiche(id, page) {
+async function fiche(id, page, contributors) {
   const props = [];
   for (const [pname, pr] of Object.entries(page.properties || {})) {
     if (SKIP.has(pr.type) || /ancien/i.test(pname)) continue;
@@ -286,7 +286,7 @@ async function fiche(id, page) {
     html = local ? html.replace(`@@IMG${k}@@`, local).replace(`<!--img${k}-->`, "").replace(`<!--/img${k}-->`, "")
                  : html.replace(new RegExp(`<!--img${k}-->[\\s\\S]*?<!--/img${k}-->`), "");
   }
-  return { id, props, html };
+  return { id, props, html, contributors };
 }
 
 // ---------------------------------------------------------------- Génération
@@ -295,9 +295,26 @@ await fs.rm(OUT, { recursive: true, force: true });
 await fs.mkdir(path.join(OUT, "fiches"), { recursive: true });
 await fs.mkdir(path.join(OUT, "img"), { recursive: true });
 
-const pages = new Map(), nodes = new Map(), rels = [];
+// Noms des contributeurs
+const people = new Map();
+try {
+  const src = await sourceId(CONTRIBUTEURS);
+  let cursor = null;
+  do {
+    const body = { page_size: 100 }; if (cursor) body.start_cursor = cursor;
+    const r = await notion("POST", `/data_sources/${src}/query`, body);
+    for (const page of r.results || []) {
+      const t = Object.values(page.properties || {}).find(p => p.type === "title");
+      if (t && !page.in_trash && !page.archived) people.set(nid(page.id), plain(t.title));
+    }
+    cursor = r.has_more ? r.next_cursor : null;
+  } while (cursor);
+  console.log(`Contributeurs : ${people.size}`);
+} catch (e) { console.warn("Contributeurs illisibles :", e.message); }
+
+const pages = new Map(), nodes = new Map(), rels = [], contrib = new Map();
 for (const b of BASES) {
-  const r = await readBase(b, pages);
+  const r = await readBase(b, pages, contrib);
   for (const x of r.nodes) nodes.set(x.id, x);
   rels.push(...r.rels);
 }
@@ -312,7 +329,7 @@ const { comm, comms, stats } = communities(list, E);
 list.forEach(x => { x.comm = comm[x.id] ?? -1; });
 const graph = {
   generated: new Date().toISOString(),
-  bases: BASES.map(b => ({ key: b.key, label: b.label, color: b.color, count: list.filter(x => x.type === b.key).length })),
+  bases: BASES.map(b => ({ key: b.key, label: b.label, one: b.one, color: b.color, count: list.filter(x => x.type === b.key).length })),
   nodes: list, edges: E, conf: [...conf.values()], comms, stats,
 };
 await fs.writeFile(path.join(OUT, "graph.json"), JSON.stringify(graph));
@@ -320,7 +337,8 @@ console.log(`Graphe : ${list.length} fiches, ${E.length} liens, ${graph.conf.len
 
 let n = 0, failed = 0;
 for (const [id, page] of pages) {
-  try { await fs.writeFile(path.join(OUT, "fiches", id + ".json"), JSON.stringify(await fiche(id, page))); }
+  const who = [...new Set((contrib.get(id) || []).map(c => people.get(c)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  try { await fs.writeFile(path.join(OUT, "fiches", id + ".json"), JSON.stringify(await fiche(id, page, who))); }
   catch (e) { failed++; console.warn("Fiche non générée :", nodes.get(id).name, e.message); }
   if (++n % 50 === 0) console.log(`${n}/${pages.size} fiches`);
 }

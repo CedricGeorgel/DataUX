@@ -38,7 +38,6 @@ start();
 function init(G) {
   const TYPES = {}; G.bases.forEach(b => { TYPES[b.key] = { label: b.label, color: b.color }; });
   const typeKeys = Object.keys(TYPES);
-  const url = n => n.url || "https://www.notion.so/" + n.id;
   const byId = new Map(G.nodes.map(n => [n.id, n]));
   G.nodes.forEach(n => { n.nb = new Set(); n.sug = new Set(); });
   G.edges.forEach(([a, b]) => { byId.get(a).nb.add(b); byId.get(b).nb.add(a); });
@@ -362,7 +361,6 @@ function init(G) {
   // ---------- Panneau (page complète)
   const panel = FULL ? $("panel") : null;
   const item = (n, extra = "") => `<li><span class="sw" style="background:${color(n)}"></span><button class="lnk" data-id="${n.id}">${esc(n.name)}</button>${extra}</li>`;
-  const fmt = x => String(x).replace(".", ",");
   function renderPanel() {
     if (!panel) return;
     if (state.focus) { const n = byId.get(state.focus);
@@ -370,7 +368,7 @@ function init(G) {
       let h = `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
         <h1 style="margin-top:12px">${esc(n.name)}</h1>
         <p><span class="tag" style="border-color:${color(n)}">${esc(TYPES[n.type].label)}</span>${n.cat ? `<span class="tag">${esc(n.cat)}</span>` : ""}</p>
-        <div class="acts"><button class="btn" data-read="${n.id}">Lire la fiche</button><a class="btn" href="${esc(url(n))}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a></div>
+        <div class="acts"><button class="btn" data-read="${n.id}">Lire la fiche</button></div>
         <h2>${n.deg} lien${n.deg > 1 ? "s" : ""}</h2>`;
       if (!n.deg) h += `<p class="muted">Aucune relation logique. Cette fiche n'est reliée à rien.</p>`;
       typeKeys.forEach(t => { if (groups[t]) h += `<h3>${esc(TYPES[t].label)} · ${groups[t].length}</h3><ul class="links">${groups[t].sort((a, b) => b.deg - a.deg).map(m => item(m)).join("")}</ul>`; });
@@ -379,28 +377,15 @@ function init(G) {
     } else {
       const hubs = G.nodes.slice().sort((a, b) => b.deg - a.deg).slice(0, 8);
       const iso = G.nodes.filter(n => n.deg === 0);
-      const bridges = G.nodes.filter(n => new Set([...n.nb].map(i => byId.get(i).type)).size >= 4).sort((a, b) => b.deg - a.deg).slice(0, 12);
-      const same = G.edges.filter(([a, b]) => byId.get(a).type === byId.get(b).type).length;
       const when = new Date(G.generated).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
-      const isoBy = typeKeys.map(t => [t, iso.filter(n => n.type === t)]).filter(([, l]) => l.length);
-      const S = G.stats;
       panel.innerHTML = `<h1>Réseau des fiches</h1>
-        <p class="muted">Relations entre tes ${typeKeys.length} bases Notion. Clique une fiche pour voir ses liens.</p>
         <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
         <h2>Les groupes</h2>
-        <p class="muted">Fiches plus liées entre elles qu'avec le reste (méthode de Louvain). Clique un nom pour zoomer.</p>
-        <ul class="links">${C.map((c, k) => ({ c, k })).filter(o => !o.c.small).map(o => `<li><span class="muted" style="min-width:22px">${o.c.size}</span><button class="lnk" data-comm="${o.k}">${esc(o.c.name)}</button> <span class="muted">${o.c.top.slice(0, 2).map(i => esc(byId.get(i).name)).join(", ")}</span></li>`).join("")}</ul>
-        <p>Modularité ${fmt(S.mod)} (au-dessus de 0,3, les groupes sont bien marqués). Le noyau réunit ${S.giant} fiches, avec ${fmt(Math.round(S.density * 1000) / 10)} % des liens possibles, et jusqu'à ${S.diam} sauts pour le traverser.${S.comps > 1 ? ` ${S.comps - 1} petit${S.comps > 2 ? "s" : ""} îlot${S.comps > 2 ? "s" : ""} vi${S.comps > 2 ? "vent" : "t"} à part.` : ""}</p>
+        <ul class="links">${C.map((c, k) => ({ c, k })).filter(o => !o.c.small).map(o => `<li><span class="muted" style="min-width:22px">${o.c.size}</span><button class="lnk" data-comm="${o.k}">${esc(o.c.name)}</button></li>`).join("")}</ul>
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
-        ${bridges.length ? `<h2>Les ponts entre 4 bases ou plus</h2><ul class="links">${bridges.map(n => item(n, ` <span class="muted">${new Set([...n.nb].map(i => byId.get(i).type)).size} bases</span>`)).join("")}</ul>` : ""}
-        ${iso.length ? `<h2>Les fiches isolées</h2>${isoBy.map(([t, l]) => `<details><summary>${esc(TYPES[t].label)} · ${l.length}</summary><ul class="links">${l.sort((a, b) => a.name.localeCompare(b.name, "fr")).map(n => item(n)).join("")}</ul></details>`).join("")}` : ""}
-        <h2>Deux sortes de traits</h2>
-        <p class="legend"><span class="swl"></span>Lien logique (${G.edges.length}, dont ${same} dans une même base). Ils forment les groupes.</p>
-        <p class="legend"><span class="swl conf"></span>À ne pas confondre (${G.conf.length}). Ces traits n'influencent ni les groupes ni la disposition.</p>
-        <p class="legend" style="margin-top:14px">Taille d'un point = nombre de liens logiques. Clic : voir les liens. Double clic : isoler la fiche. Molette pour zoomer, glisser pour déplacer.</p>
-        <p class="legend" style="margin-top:14px">Données Notion du ${esc(when)}. Mise à jour automatique toutes les heures.</p>`;
+        <p class="legend" style="margin-top:18px">Données Notion du ${esc(when)}. Mise à jour automatique toutes les heures.</p>`;
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
     panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
@@ -437,7 +422,7 @@ function init(G) {
     } catch (e) {
       if (e.name === "AbortError") return;
       wBody.removeAttribute("aria-busy");
-      wBody.innerHTML = `<p>Le contenu de cette fiche ne se charge pas.</p><p class="muted">${esc(e.message)}</p><div class="acts"><button class="btn" data-retry>Réessayer</button><a class="btn" href="${esc(url(n))}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a></div>`;
+      wBody.innerHTML = `<p>Le contenu de cette fiche ne se charge pas.</p><p class="muted">${esc(e.message)}</p><div class="acts"><button class="btn" data-retry>Réessayer</button></div>`;
       wBody.querySelector("[data-retry]").onclick = () => { shown = null; loadFiche(id); };
     }
   }
@@ -446,7 +431,8 @@ function init(G) {
     wBody.removeAttribute("aria-busy");
     const props = j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
     const body = j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`;
-    wBody.innerHTML = props + body + `<div class="acts" style="margin-top:16px"><a class="btn" href="${esc(url(n))}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a></div>`;
+    const who = j.contributors && j.contributors.length ? j.contributors.map(esc).join(", ") : `<span class="muted">Personne pour l'instant</span>`;
+    wBody.innerHTML = props + body + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p></div>`;
     wBody.scrollTop = 0;
     wBody.querySelectorAll("[data-id]").forEach(b => {
       if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true);
@@ -458,20 +444,43 @@ function init(G) {
     wCol.onclick = () => setCollapsed(!win.classList.contains("collapsed"));
     if (store.get("reseau-win-collapsed")) setCollapsed(true);
     win.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); closeWin(); } });
-    const head = win.querySelector(".whead");
+    draggable(win, "reseau-win-pos");
+    win.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setCollapsed(!win.classList.contains("collapsed")); });
+  }
+  // Une fenêtre se déplace en tirant sa barre de titre ; sa position est gardée
+  function draggable(el, key) {
+    const head = el.querySelector(".whead");
     head.addEventListener("pointerdown", e => {
       if (e.target.closest("button") || innerWidth <= 760) return;
       e.preventDefault(); head.setPointerCapture(e.pointerId);
-      const r = win.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+      const r = el.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
       const move = ev => {
         const x = Math.min(Math.max(0, ev.clientX - ox), innerWidth - 120), y = Math.min(Math.max(0, ev.clientY - oy), innerHeight - 44);
-        win.style.left = x + "px"; win.style.top = y + "px";
+        el.style.left = x + "px"; el.style.top = y + "px"; el.style.bottom = "auto"; el.style.right = "auto";
       };
       const up = () => { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up);
-        store.set("reseau-win-pos", { x: parseFloat(win.style.left), y: parseFloat(win.style.top) }); };
+        store.set(key, { x: parseFloat(el.style.left), y: parseFloat(el.style.top) }); };
       head.addEventListener("pointermove", move); head.addEventListener("pointerup", up);
     });
-    head.addEventListener("dblclick", e => { if (!e.target.closest("button")) setCollapsed(!win.classList.contains("collapsed")); });
+  }
+
+  // ---------- Légende : fenêtre repliable et déplaçable (page complète)
+  if (FULL) {
+    const lw = $("legendWin"), lb = lw.querySelector(".wbody"), lc = lw.querySelector("[data-collapse]");
+    lb.innerHTML = `<ul class="leg">
+        <li><span class="swl"></span>Lien logique</li>
+        <li><span class="swl conf"></span>À ne pas confondre</li>
+        ${G.bases.map(b => `<li><span class="dot" style="background:${b.color}"></span>${esc(b.one || b.label)}</li>`).join("")}
+      </ul>
+      <ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Molette pour zoomer, glisser pour déplacer.</li></ul>`;
+    const setL = c => { lw.classList.toggle("collapsed", c); lc.setAttribute("aria-expanded", !c); lc.setAttribute("aria-label", c ? "Déplier la légende" : "Replier la légende"); lc.textContent = c ? "▸" : "▾"; store.set("reseau-legend-collapsed", c); };
+    lc.onclick = () => setL(!lw.classList.contains("collapsed"));
+    lw.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setL(!lw.classList.contains("collapsed")); });
+    const saved = store.get("reseau-legend-collapsed");
+    setL(saved === null ? innerWidth <= 760 : saved);
+    const p = store.get("reseau-legend-pos");
+    if (p && innerWidth > 760) { lw.style.left = Math.min(Math.max(0, p.x), innerWidth - 120) + "px"; lw.style.top = Math.min(Math.max(0, p.y), innerHeight - 44) + "px"; lw.style.bottom = "auto"; lw.style.right = "auto"; }
+    draggable(lw, "reseau-legend-pos");
   }
 
   // ---------- Lancement
