@@ -440,7 +440,7 @@ function init(G) {
     const who = j.contributors && j.contributors.length ? j.contributors.map(esc).join(", ") : `<span class="muted">Personne pour l'instant</span>`;
     const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.id;
     const acts = [
-      F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
+      F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
       F.proposition ? `<a class="btn" href="${esc(formUrl(F.proposition, { liee: n.name }))}" target="_blank" rel="noopener noreferrer">Proposer une fiche liée</a>` : "",
     ].join("");
     wBody.innerHTML = props + body + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p>${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;

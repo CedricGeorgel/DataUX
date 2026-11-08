@@ -46,7 +46,7 @@ export const NOMS_GROUPES = {
 
 // Formulaires de contribution (Tally). Colle ici leurs liens : les boutons apparaissent sur le site
 // à la publication suivante. Laisse vide pour masquer un bouton.
-// Champs cachés attendus : « fiche » et « lien » (erreur), « liee » (proposition).
+// Champs cachés attendus : « type », « fiche » et « lien » (erreur), « liee » (proposition).
 export const FORMULAIRES = {
   erreur: "",
   proposition: "",
