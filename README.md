@@ -1,27 +1,50 @@
-# DataUX · Réseau des fiches
+# DataUX
 
-Graphe des relations entre les 8 bases Notion de « Ressources partagées » (KPI, lois, biais, méthodes,
-frameworks, acteurs, glossaire, bibliographie).
+Une base de connaissances commune sur le design et l'UX. Et une carte pour voir comment tout se tient.
 
-- `index.html` : vue complète (recherche, filtres, panneau, fenêtre de lecture des fiches)
-- `embed.html` : nuage seul, à intégrer dans Notion avec `/embed`
+**Explorer la carte : [cedricgeorgel.github.io/DataUX](https://cedricgeorgel.github.io/DataUX/)**
 
-## Fonctionnement
+## Pourquoi
 
-Le site est 100 % statique, publié sur GitHub Pages. Toutes les heures (et à chaque push, ou avec
-le bouton *Run workflow* de l'onglet Actions), GitHub lit Notion, génère `data/graph.json`, une fiche
-par page et copie les images, puis publie le site.
+En design, on apprend par morceaux. Un cours sur les biais cognitifs. Un atelier sur les méthodes de recherche. Un livre sur la stratégie produit. Chaque notion reste dans sa case.
 
-Le token Notion est le secret `NOTION_TOKEN` du dépôt. Il n'est jamais écrit dans le code ni dans le site.
-La connexion Notion doit être en lecture seule.
+Pourtant, tout se répond. La loi de Hick éclaire un choix de navigation. L'effet d'ancrage pèse sur un test A/B. Un persona n'a de sens qu'avec les entretiens qui le nourrissent.
 
-## Réglages
+DataUX rassemble ces connaissances au même endroit et rend ces liens visibles.
 
-Couleurs, bases et noms des groupes : `scripts/config.js`.
+## Ce qu'on y trouve
 
-## Lancer en local
+8 bases de fiches, rédigées et relues :
 
-```sh
-NOTION_TOKEN=ntn_xxx node scripts/build.mjs site/data
-cd site && python3 -m http.server
-```
+- **Biais cognitifs** : les raccourcis de pensée qui influencent les utilisateurs, et les designers
+- **Lois du design** : les principes établis, de Fitts à Jakob
+- **Méthodes UX** : quand les utiliser, comment, et ce qu'elles produisent
+- **Frameworks produit** : pour prioriser, décider et piloter
+- **Fiches KPI** : les indicateurs pour mesurer l'expérience
+- **Acteurs du design** : les personnes qui ont façonné la discipline
+- **Glossaire design** : le vocabulaire du métier
+- **Bibliographie design** : les ouvrages de référence
+
+## Les liens entre les fiches
+
+Chaque fiche est reliée à celles qui la complètent. Une méthode renvoie aux biais qu'elle doit éviter. Un KPI renvoie aux frameworks qui l'utilisent.
+
+Certaines notions se ressemblent sans être identiques. Elles sont reliées en rouge, avec la mention « À ne pas confondre ».
+
+Sur la carte, les fiches très liées entre elles forment des groupes. Ces groupes ne sont pas définis à la main : ils apparaissent d'eux-mêmes, à partir des liens.
+
+## Explorer
+
+- **Clic** sur une fiche : ses liens s'allument.
+- **Double clic** : la fiche est isolée avec ses voisines.
+- **Lire la fiche** : son contenu s'ouvre dans une fenêtre, sans quitter la carte.
+
+La carte existe aussi en version allégée, à intégrer dans une page Notion : [embed.html](https://cedricgeorgel.github.io/DataUX/embed.html).
+
+## Contribuer
+
+Les fiches vivent dans Notion. Quand quelqu'un relit une fiche, il s'ajoute dans ses contributeurs. Son nom apparaît alors en bas de la fiche, sur la carte.
+
+## En coulisses
+
+La carte se met à jour toute seule toutes les heures, à partir de Notion. L'accès à Notion est en lecture seule et reste privé. Les réglages (couleurs, noms des groupes) sont dans `scripts/config.js`.
