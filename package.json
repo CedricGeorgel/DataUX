@@ -1,0 +1,7 @@
+{
+  "name": "dataux",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node scripts/build.mjs site/data" },
+  "engines": { "node": ">=20" }
+}

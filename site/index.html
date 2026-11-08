@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Réseau des fiches · Ressources partagées</title>
+<meta name="robots" content="noindex">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="assets/graph.css">
+</head>
+<body data-mode="full">
+<div id="graph"><svg id="svg" role="img" aria-label="Graphe des relations entre les fiches"></svg></div>
+<div class="bar">
+  <input id="q" type="search" placeholder="Chercher une fiche…" aria-label="Chercher une fiche" list="names">
+  <datalist id="names"></datalist>
+  <div class="fwrap">
+    <button class="btn" id="filterBtn" aria-expanded="false" aria-controls="filters">Filtres <span id="fcount" class="muted"></span> ▾</button>
+    <div class="pop" id="filters" role="group" aria-label="Filtres">
+      <h4>Bases</h4>
+      <div class="row" id="chips"></div>
+      <h4>Affichage</h4>
+      <div class="row">
+        <button class="btn" id="isoBtn" aria-pressed="true">Masquer les fiches isolées</button>
+        <button class="btn" id="sugBtn" aria-pressed="true">Masquer les confusions</button>
+      </div>
+    </div>
+  </div>
+  <button class="btn" id="panelBtn" aria-expanded="true" aria-controls="panel" style="margin-left:auto">Masquer le panneau</button>
+</div>
+<aside id="panel" aria-live="polite"></aside>
+<section class="win" id="win" role="dialog" aria-label="Contenu de la fiche">
+  <div class="whead">
+    <span class="sw"></span><span class="wt"></span>
+    <button class="ib" data-collapse aria-expanded="true" aria-label="Replier la fiche" title="Replier">▾</button>
+    <button class="ib" data-close aria-label="Fermer la fiche" title="Fermer">✕</button>
+  </div>
+  <div class="wbody"></div>
+</section>
+<script src="assets/d3.min.js"></script>
+<script src="assets/graph.js"></script>
+</body>
+</html>

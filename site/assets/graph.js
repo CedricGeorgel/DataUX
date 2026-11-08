@@ -1,0 +1,485 @@
+// Réseau des fiches. Une seule base de code pour les deux pages :
+// <body data-mode="full"> = page complète, <body data-mode="embed"> = nuage seul pour Notion.
+(function () {
+"use strict";
+const MODE = document.body.dataset.mode || "full";
+const FULL = MODE === "full";
+const API_GRAPH = "data/graph.json";
+const API_FICHE = id => "data/fiches/" + id + ".json";
+const BIG = "index.html";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+
+// ---------------------------------------------------------------- Écrans de chargement, d'erreur et de premier lancement
+const screen = document.createElement("div"); screen.className = "screen"; document.body.appendChild(screen);
+function showScreen(html) { screen.style.display = "flex"; screen.innerHTML = `<div class="box">${html}</div>`; }
+function hideScreen() { screen.style.display = "none"; screen.innerHTML = ""; }
+function showLoading() { showScreen(`<p class="loading" role="status">Chargement des fiches<span class="dots"></span></p>`); }
+function showError(msg) {
+  showScreen(`<h1>Les fiches ne se chargent pas</h1><p>${esc(msg)}</p><button class="btn" id="retry">Réessayer</button>`);
+  $("retry").onclick = start;
+}
+async function start() {
+  showLoading();
+  let r, j;
+  try { r = await fetch(API_GRAPH, { cache: "no-cache" }); }
+  catch (e) { return showError("Le site ne répond pas. Vérifie ta connexion, puis réessaie."); }
+  if (r.status === 404) return showError("Les données ne sont pas encore publiées. Elles arrivent à la prochaine mise à jour.");
+  try { j = await r.json(); } catch (e) { j = null; }
+  if (!r.ok || !j || !j.nodes) return showError("Les données sont illisibles (erreur " + r.status + ").");
+  hideScreen();
+  init(j);
+}
+start();
+
+// ---------------------------------------------------------------- Le graphe
+function init(G) {
+  const TYPES = {}; G.bases.forEach(b => { TYPES[b.key] = { label: b.label, color: b.color }; });
+  const typeKeys = Object.keys(TYPES);
+  const url = n => n.url || "https://www.notion.so/" + n.id;
+  const byId = new Map(G.nodes.map(n => [n.id, n]));
+  G.nodes.forEach(n => { n.nb = new Set(); n.sug = new Set(); });
+  G.edges.forEach(([a, b]) => { byId.get(a).nb.add(b); byId.get(b).nb.add(a); });
+  G.conf.forEach(([a, b]) => { byId.get(a).sug.add(b); byId.get(b).sug.add(a); });
+  G.nodes.forEach(n => n.deg = n.nb.size);
+  const state = { ring: false, types: new Set(typeKeys), showIso: true, showSug: true, focus: null };
+  const color = n => TYPES[n.type].color;
+
+  // ---------- Barre de filtres (page complète)
+  const sideW = () => !FULL || document.body.classList.contains("nopanel") || innerWidth <= 760 ? 0 : 360;
+  const topH = FULL ? 70 : 20;
+  // Zone libre de l'écran : sans la barre, le panneau et la fenêtre de fiche
+  function viewArea() {
+    let x0 = 0, x1 = innerWidth - sideW(), y0 = topH, y1 = innerHeight;
+    if (FULL && innerWidth <= 760 && !document.body.classList.contains("nopanel")) y1 = innerHeight * .55 - 12;
+    const w = FULL && $("win");
+    if (w && w.classList.contains("open") && !w.classList.contains("collapsed") && innerWidth > 760) {
+      const r = w.getBoundingClientRect();
+      if (r.left + r.width / 2 < (x0 + x1) / 2) { if (x1 - r.right > 300) x0 = r.right; }
+      else if (r.left - x0 > 300) x1 = r.left;
+    }
+    return { x0, x1, y0, y1, W: x1 - x0, H: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  }
+  let chips = null, isoBtn = null;
+  const isoCount = G.nodes.filter(n => n.deg === 0).length;
+  if (FULL) {
+    const filterBtn = $("filterBtn"), pop = $("filters");
+    const closePop = () => { pop.classList.remove("open"); filterBtn.setAttribute("aria-expanded", "false"); };
+    filterBtn.onclick = e => { e.stopPropagation(); const o = pop.classList.toggle("open"); filterBtn.setAttribute("aria-expanded", o); };
+    document.addEventListener("click", e => { if (pop.classList.contains("open") && !pop.contains(e.target) && !filterBtn.contains(e.target)) closePop(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) { closePop(); filterBtn.focus(); } });
+    const panelBtn = $("panelBtn");
+    panelBtn.onclick = () => { const closed = document.body.classList.toggle("nopanel"); panelBtn.textContent = closed ? "Afficher le panneau" : "Masquer le panneau"; panelBtn.setAttribute("aria-expanded", !closed); if (!state.focus) fitNodes(visNodes, 1.2, 400); };
+    chips = $("chips");
+    typeKeys.forEach(t => {
+      const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
+      b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span>${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span>`;
+      b.onclick = () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); b.classList.toggle("off", !state.types.has(t)); b.setAttribute("aria-pressed", state.types.has(t)); state.focus ? select(state.focus, false, state.ring) : update(); };
+      chips.appendChild(b);
+    });
+    isoBtn = $("isoBtn");
+    const isoLabel = () => { isoBtn.textContent = (state.showIso ? "Masquer" : "Afficher") + ` les ${isoCount} fiches isolées`; isoBtn.classList.toggle("on", state.showIso); isoBtn.setAttribute("aria-pressed", state.showIso); };
+    isoLabel(); if (!isoCount) isoBtn.style.display = "none";
+    isoBtn.onclick = () => { state.showIso = !state.showIso; isoLabel(); update(); };
+    const sugBtn = $("sugBtn"); if (!G.conf.length) sugBtn.style.display = "none";
+    const sugLabel = () => { sugBtn.textContent = state.showSug ? "Masquer les confusions" : "Afficher les confusions"; sugBtn.classList.toggle("on", state.showSug); sugBtn.setAttribute("aria-pressed", state.showSug); };
+    sugLabel();
+    sugBtn.onclick = () => { state.showSug = !state.showSug; sugLabel(); state.focus ? select(state.focus, false, state.ring) : update(); };
+    const dl = $("names");
+    G.nodes.slice().sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(n => { const o = document.createElement("option"); o.value = n.name; dl.appendChild(o); });
+    $("q").addEventListener("change", e => {
+      const v = e.target.value.trim().toLowerCase(); if (!v) return;
+      const n = G.nodes.find(x => x.name.toLowerCase() === v) || G.nodes.find(x => x.name.toLowerCase().includes(v));
+      if (n) select(n.id, true);
+    });
+  }
+  function filterCount() {
+    if (!FULL) return;
+    const n = (typeKeys.length - state.types.size) + (state.showIso ? 0 : 1) + (state.showSug ? 0 : 1);
+    $("fcount").textContent = n ? "· " + n : "";
+  }
+
+  // ---------- Bouton « Ouvrir en grand » (page nuage seul)
+  let bigLink = null;
+  if (!FULL) {
+    bigLink = document.createElement("a"); bigLink.className = "btn open-big"; bigLink.target = "_blank"; bigLink.rel = "noopener";
+    bigLink.href = BIG; bigLink.textContent = "Ouvrir en grand ↗"; document.body.appendChild(bigLink);
+    const hint = document.createElement("div"); hint.className = "hint"; hint.textContent = "Clic : voir les liens · Double clic : isoler la fiche"; document.body.appendChild(hint);
+  }
+
+  // ---------- SVG
+  const svg = d3.select("#svg"); svg.selectAll("*").remove();
+  const root = svg.append("g");
+  const gHulls = root.append("g"), gEdges = root.append("g"), gNodes = root.append("g");
+  const zoom = d3.zoom().scaleExtent([.15, 5]).on("zoom", e => { root.attr("transform", e.transform); labelVis(e.transform.k); });
+  svg.call(zoom).on("dblclick.zoom", null);
+  svg.on("click", e => { if (e.target === svg.node()) select(null); });
+
+  // ---------- Disposition par groupes (Louvain calculé par le serveur)
+  const C = G.comms;
+  const sameComm = (a, b) => { a = a.id ? a : byId.get(a); b = b.id ? b : byId.get(b); return a.comm === b.comm && a.comm >= 0; };
+  function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy; let u = L ? ((px - ax) * dx + (py - ay) * dy) / L : 0;
+    u = Math.max(0, Math.min(1, u)); const qx = ax + u * dx, qy = ay + u * dy; return { d: Math.hypot(px - qx, py - qy), u, qx, qy }; }
+  // Une bulle par groupe. On essaie plusieurs dispositions et on garde celle où le moins de liens
+  // entre 2 bulles traversent une 3e bulle, puis la plus compacte. Tirages fixes : même vue à chaque ouverture.
+  function anchors() {
+    const w = {};
+    G.edges.forEach(([a, b]) => { const ca = byId.get(a).comm, cb = byId.get(b).comm;
+      if (ca !== cb && ca >= 0 && cb >= 0) { const key = Math.min(ca, cb) + "-" + Math.max(ca, cb); w[key] = (w[key] || 0) + 1; } });
+    const pairs = Object.entries(w).map(([k, v]) => { const [s, t] = k.split("-").map(Number); return { s, t, w: v }; });
+    function edgeAvoid(nodes, links, margin) { let alpha = 0;
+      const f = a => { alpha = a; links.forEach(l => { const S = l.source, T = l.target;
+        nodes.forEach(c => { if (c === S || c === T) return; const r = segDist(c.x, c.y, S.x, S.y, T.x, T.y);
+          const need = c.r + margin; if (r.u > 0.02 && r.u < 0.98 && r.d < need) { const nx = (c.x - r.qx) || 1e-3, ny = (c.y - r.qy) || 1e-3, n = Math.hypot(nx, ny);
+            const push = (need - r.d) * alpha * 0.6; c.vx += nx / n * push; c.vy += ny / n * push; S.vx -= nx / n * push * .25; S.vy -= ny / n * push * .25; T.vx -= nx / n * push * .25; T.vy -= ny / n * push * .25; } }); }); };
+      f.initialize = () => {}; return f; }
+    function run(seed) {
+      const rnd = d3.randomLcg(seed);
+      const sup = C.map((c, k) => ({ c, k })).filter(o => !o.c.small).map(({ c, k }) => { const a = rnd() * 6.283, d = 150 + rnd() * 350; return { k, r: 15 * Math.sqrt(c.size) + 16, x: Math.cos(a) * d, y: Math.sin(a) * d }; });
+      const sl = pairs.filter(p => !C[p.s].small && !C[p.t].small).map(p => ({ source: p.s, target: p.t, w: p.w }));
+      const ss = d3.forceSimulation(sup).stop().randomSource(d3.randomLcg(seed + 1))
+        .force("link", d3.forceLink(sl).id(d => d.k).distance(l => l.source.r + l.target.r + 60).strength(l => Math.min(.8, .12 * l.w)))
+        .force("charge", d3.forceManyBody().strength(d => -25 * d.r))
+        .force("collide", d3.forceCollide(d => d.r + 40))
+        .force("avoid", edgeAvoid(sup, sl, 22))
+        .force("x", d3.forceX(0).strength(.05)).force("y", d3.forceY(0).strength(.05));
+      for (let i = 0; i < 700; i++) ss.tick();
+      let cross = 0;
+      sl.forEach(l => sup.forEach(c => { if (c === l.source || c === l.target) return;
+        const r = segDist(c.x, c.y, l.source.x, l.source.y, l.target.x, l.target.y); if (r.u > 0 && r.u < 1 && r.d < c.r + 8) cross += l.w; }));
+      const cx = d3.mean(sup, s => s.x) || 0, cy = d3.mean(sup, s => s.y) || 0;
+      const R = d3.max(sup, s => Math.hypot(s.x - cx, s.y - cy) + s.r) || 0;
+      return { sup, cross, R, score: cross * 300 + R };
+    }
+    const runs = C.filter(c => !c.small).length > 2 ? 60 : 1;
+    let best = null; for (let seed = 1; seed <= runs; seed++) { const r = run(seed); if (!best || r.score < best.score) best = r; }
+    const sup = best.sup, a = {}; sup.forEach(s => a[s.k] = [s.x, s.y]);
+    if (!sup.length) sup.push({ k: -1, r: 60, x: 0, y: 0 });
+    // fiches isolées : couronne irrégulière qui suit la forme de l'ensemble, groupées par base
+    const rnd = d3.randomLcg(7);
+    // une fiche isolée qui a une confusion avec une fiche d'un groupe se place juste à l'extérieur de ce groupe
+    const gx = d3.mean(sup, s => s.x), gy = d3.mean(sup, s => s.y), near = new Map();
+    G.nodes.filter(n => n.comm < 0).forEach(n => { const p = [...n.sug].map(i => byId.get(i)).find(m => m.comm >= 0 && a[m.comm]); if (!p) return;
+      const s = sup.find(o => o.k === p.comm), k = near.get(p.comm) || 0; near.set(p.comm, k + 1);
+      const t = Math.atan2(s.y - gy, s.x - gx) + (k - .5) * .35; n.iso = [s.x + (s.r + 55) * Math.cos(t), s.y + (s.r + 55) * Math.sin(t)]; n.nearComm = true; });
+    const iso = G.nodes.filter(n => n.comm < 0 && !n.nearComm).sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
+    // les îlots de 2 fiches rejoignent la couronne, répartis entre les fiches isolées
+    const smalls = C.map((c, k) => ({ c, k })).filter(o => o.c.small).map(o => ({ small: o.k }));
+    const crown = iso.slice(); smalls.forEach((o, i) => crown.splice(Math.round((i + .5) * crown.length / smalls.length) + i, 0, o));
+    const x0 = d3.min(sup, s => s.x - s.r), x1 = d3.max(sup, s => s.x + s.r), y0 = d3.min(sup, s => s.y - s.r), y1 = d3.max(sup, s => s.y + s.r);
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2 + 90, ry = (y1 - y0) / 2 + 90, ph = rnd() * 6.28;
+    crown.forEach((n, i) => { const t = -Math.PI / 2 + (i + (rnd() - .5) * .8) * 2 * Math.PI / crown.length;
+      const wob = 1 + .07 * Math.sin(3 * t + ph) + .05 * Math.sin(5 * t + 2 * ph), off = (rnd() - .3) * 70;
+      const p = [cx + (rx * wob + off) * Math.cos(t), cy + (ry * wob + off) * Math.sin(t)];
+      if (n.small !== undefined) a[n.small] = p; else n.iso = p; });
+    return a;
+  }
+  const A = anchors();
+  const ax = d => d.comm < 0 ? d.iso[0] : A[d.comm][0], ay = d => d.comm < 0 ? d.iso[1] : A[d.comm][1];
+  const rad = n => 4 + Math.sqrt(n.deg) * 2.6;
+  const sim = d3.forceSimulation().alphaDecay(.025)
+    .force("link", d3.forceLink().id(d => d.id)
+      .distance(l => l.sug ? 140 : sameComm(l.source, l.target) ? 40 : 160)
+      .strength(l => l.sug ? 0 : sameComm(l.source, l.target) ? .5 : .02))
+    .force("charge", d3.forceManyBody().strength(-60).distanceMax(170))
+    .force("x", d3.forceX(ax).strength(d => d.comm < 0 ? .06 : .13))
+    .force("y", d3.forceY(ay).strength(d => d.comm < 0 ? .06 : .13))
+    .force("collide", d3.forceCollide(d => rad(d) + 5));
+  const rndN = d3.randomLcg(3); sim.randomSource(d3.randomLcg(5));
+  G.nodes.forEach(n => { n.x = ax(n) + (rndN() - .5) * 40; n.y = ay(n) + (rndN() - .5) * 40; });
+
+  let nodeSel, edgeSel, visNodes = [], visEdges = [];
+  function update() {
+    filterCount();
+    visNodes = G.nodes.filter(n => state.types.has(n.type) && (state.showIso || n.deg > 0 || (state.showSug && n.sug.size)));
+    const vis = new Set(visNodes.map(n => n.id));
+    visEdges = G.edges.filter(([a, b]) => vis.has(a) && vis.has(b)).map(([a, b]) => ({ source: a, target: b, sug: false }));
+    if (state.showSug) G.conf.forEach(([a, b]) => { if (vis.has(a) && vis.has(b)) visEdges.push({ source: a, target: b, sug: true }); });
+    edgeSel = gEdges.selectAll("line").data(visEdges, d => (d.source.id || d.source) + (d.target.id || d.target) + d.sug)
+      .join("line").attr("class", d => "edge" + (d.sug ? " sug" : "") + (!d.sug && !sameComm(d.source, d.target) ? " cross" : ""));
+    nodeSel = gNodes.selectAll("g.node").data(visNodes, d => d.id).join(enter => {
+      const g = enter.append("g").attr("class", "node").attr("tabindex", 0).attr("role", "button")
+        .attr("aria-label", d => `${d.name}, ${TYPES[d.type].label}, ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
+      g.append("circle").attr("r", rad);
+      g.append("text").attr("dy", d => -rad(d) - 4).attr("text-anchor", "middle").text(d => d.name);
+      g.append("title").text(d => `${d.name} · ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
+      g.on("click", (e, d) => { e.stopPropagation(); if (state.focus !== d.id || state.ring) select(d.id); })
+       .on("dblclick", (e, d) => { e.stopPropagation(); e.preventDefault(); select(d.id, false, true); })
+       .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.id, false, e.shiftKey); } })
+       .call(d3.drag().on("start", (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
+         .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); if (!d.ring) { d.fx = null; d.fy = null; } }));
+      return g;
+    });
+    nodeSel.sort((a, b) => a.deg - b.deg);
+    sim.nodes(visNodes); sim.force("link").links(visEdges); sim.alpha(.8).restart();
+    paint(); placeLabels(); labelVis(d3.zoomTransform(svg.node()).k); highlight();
+  }
+  function placeLabels() { if (!nodeSel) return;
+    nodeSel.select("text")
+      .attr("text-anchor", d => d.ring === "R" ? "start" : d.ring === "L" ? "end" : "middle")
+      .attr("dx", d => d.ring === "R" ? rad(d) + 6 : d.ring === "L" ? -(rad(d) + 6) : 0)
+      .attr("dy", d => d.ring === "R" || d.ring === "L" ? "0.32em" : -rad(d) - 4)
+      .style("font-weight", d => d.ring === "C" ? 600 : null)
+      .style("font-size", d => d.ring === "C" ? "13px" : "10.5px");
+  }
+  function releaseRing() { G.nodes.forEach(n => { if (n.ring) { n.ring = null; n.fx = null; n.fy = null; } }); }
+  function buildRing(f) {
+    const vis = new Set(visNodes.map(n => n.id));
+    const nbs = [...new Set([...f.nb, ...(state.showSug ? f.sug : [])])].map(i => byId.get(i)).filter(n => vis.has(n.id))
+      .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
+    const half = Math.ceil(nbs.length / 2), sides = [["R", nbs.slice(0, half)], ["L", nbs.slice(half)]];
+    const STEP = 22; let maxH = 0, R = 150;
+    sides.forEach(([, arr]) => { const H = (arr.length - 1) * STEP; maxH = Math.max(maxH, H); R = Math.max(R, H / 2 + 48); });
+    const targets = [];
+    f.ring = "C"; targets.push([f, f.x, f.y, f.x, f.y]);
+    sides.forEach(([side, arr]) => { const H = (arr.length - 1) * STEP, sx = side === "R" ? 1 : -1;
+      arr.forEach((n, i) => { const y = -H / 2 + i * STEP, x = sx * Math.sqrt(Math.max(R * R - y * y, (R * 0.35) ** 2));
+        n.ring = side; targets.push([n, n.x, n.y, f.x + x, f.y + y]); }); });
+    f.fx = f.x; f.fy = f.y;
+    d3.transition().duration(450).ease(d3.easeCubicOut).tween("ring", () => t => {
+      targets.forEach(([n, x0, y0, x1, y1]) => { n.fx = x0 + (x1 - x0) * t; n.fy = y0 + (y1 - y0) * t; });
+    });
+    sim.alpha(.35).restart();
+    placeLabels();
+    return { R, H: maxH };
+  }
+  function paint() { if (nodeSel) nodeSel.select("circle").attr("fill", color); }
+
+  // ---------- Placement des noms sans chevauchement
+  let curK = 1, raf = 0;
+  const mctx = document.createElement("canvas").getContext("2d"), tw = new Map();
+  function textW(name) { if (!tw.has(name)) { mctx.font = "500 100px Inter, system-ui, sans-serif"; tw.set(name, mctx.measureText(name).width / 100); } return tw.get(name); }
+  if (document.fonts) document.fonts.ready.then(() => { tw.clear(); scheduleLabels(); });
+  function labelVis(k) { curK = k; scheduleLabels(); }
+  function scheduleLabels() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; layoutLabels(); }); }
+  function layoutLabels() {
+    if (!nodeSel) return; const k = curK;
+    const boxes = [], hit = b => { for (const o of boxes) { if (b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]) return true; } return false; };
+    const circles = visNodes.map(n => ({ id: n.id, b: [n.x - rad(n), n.y - rad(n), n.x + rad(n), n.y + rad(n)] }));
+    const onCircle = (b, id, only) => circles.some(c => c.id !== id && (!only || only.has(c.id)) && b[0] < c.b[2] && b[2] > c.b[0] && b[1] < c.b[3] && b[3] > c.b[1]);
+    // noms des groupes d'abord, par taille : au-dessus de la bulle, sinon décalés, sinon masqués
+    const hfs = 13 / k, hpl = new Map();
+    gHulls.selectAll("g.hull").data().slice().sort((a, b) => C[b.k].size - C[a.k].size).forEach(d => {
+      const nm = C[d.k].name.toUpperCase(), w = (textW(nm) * 1.06 + .06 * nm.length) * hfs;
+      for (const lift of [0, hfs * 1.3]) for (const sh of [0, -w / 3, w / 3]) {
+        const y = d.top - 10 / k - lift, x = d.cx + sh, b = [x - w / 2, y - hfs, x + w / 2, y + 2 / k];
+        if (!hit(b) && !onCircle(b, null)) { boxes.push(b); hpl.set(d.k, { x, y }); return; } }
+    });
+    gHulls.selectAll("g.hull text").style("font-size", hfs + "px").style("display", d => hpl.has(d.k) ? null : "none")
+      .attr("x", d => hpl.has(d.k) ? hpl.get(d.k).x : d.cx).attr("y", d => hpl.has(d.k) ? hpl.get(d.k).y : 0);
+    const txt = nodeSel.select("text");
+    if (state.focus && state.ring) { txt.style("display", d => d.ring ? null : "none"); placeLabels(); return; }
+    const fs = 11 / k, h = fs * 1.2, gap = 3 / k;
+    const place = new Map();
+    const minDeg = k < 0.55 ? 9 : k < 0.8 ? 6 : k < 1.1 ? 4 : k < 1.5 ? 2 : k < 2 ? 1 : 0;
+    const F = state.focus && byId.get(state.focus), keepL = F ? new Set([F.id, ...F.nb, ...(state.showSug ? F.sug : [])]) : null;
+    visNodes.filter(d => F ? keepL.has(d.id) : d.deg >= minDeg).sort((a, b) => (F ? (b.id === F.id) - (a.id === F.id) : 0) || b.deg - a.deg || a.name.localeCompare(b.name)).forEach(d => {
+      const w = textW(d.name) * fs, r = rad(d);
+      const cand = [
+        { a: "middle", dx: 0, dy: -(r + gap) - fs * .22, b: [d.x - w / 2, d.y - r - gap - h, d.x + w / 2, d.y - r - gap] },
+        { a: "middle", dx: 0, dy: r + gap + fs * .85, b: [d.x - w / 2, d.y + r + gap, d.x + w / 2, d.y + r + gap + h] },
+        { a: "start", dx: r + gap, dy: fs * .35, b: [d.x + r + gap, d.y - h / 2, d.x + r + gap + w, d.y + h / 2] },
+        { a: "end", dx: -(r + gap), dy: fs * .35, b: [d.x - r - gap - w, d.y - h / 2, d.x - r - gap, d.y + h / 2] }];
+      for (const c of cand) { if (!hit(c.b) && (d.deg >= 10 || !onCircle(c.b, d.id, keepL))) { boxes.push(c.b); place.set(d.id, c); return; } }
+    });
+    txt.style("display", d => place.has(d.id) ? null : "none").style("font-size", fs + "px").style("font-weight", null)
+      .attr("text-anchor", d => place.has(d.id) ? place.get(d.id).a : "middle")
+      .attr("dx", d => place.has(d.id) ? place.get(d.id).dx : 0)
+      .attr("dy", d => place.has(d.id) ? place.get(d.id).dy : 0);
+  }
+  sim.on("tick", () => {
+    edgeSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+    drawHulls(); scheduleLabels();
+  });
+  const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(.5));
+  function drawHulls() {
+    const groups = d3.group(visNodes.filter(n => n.comm >= 0 && !C[n.comm].small), n => n.comm);
+    const data = [...groups].filter(([, ns]) => ns.length >= 3).map(([k, ns]) => {
+      const pts = []; ns.forEach(n => { const r = rad(n) + 16; for (let a = 0; a < 6.28; a += 0.785) pts.push([n.x + r * Math.cos(a), n.y + r * Math.sin(a)]); });
+      const h = d3.polygonHull(pts); return { k, h, top: d3.min(h, p => p[1]), cx: d3.mean(ns, n => n.x) };
+    });
+    const sel = gHulls.selectAll("g.hull").data(data, d => d.k).join(enter => {
+      const g = enter.append("g").attr("class", "hull");
+      g.append("path");
+      g.append("text").attr("text-anchor", "middle").text(d => C[d.k].name).on("click", (e, d) => { e.stopPropagation(); zoomComm(d.k); });
+      return g; });
+    sel.select("path").attr("d", d => hullLine(d.h));
+    sel.classed("dim", !!state.focus);
+  }
+  function fitNodes(ns, maxK = 1.4, dur = 600) {
+    if (!ns.length) return;
+    const v = viewArea();
+    const x0 = d3.min(ns, n => n.x) - 60, x1 = d3.max(ns, n => n.x) + 60, y0 = d3.min(ns, n => n.y) - 60, y1 = d3.max(ns, n => n.y) + 40;
+    const k = Math.min(maxK, v.W / (x1 - x0), v.H / (y1 - y0));
+    const t = d3.zoomIdentity.translate(v.cx - k * (x0 + x1) / 2, v.cy - k * (y0 + y1) / 2).scale(k);
+    (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, t);
+  }
+  function zoomComm(k) { if (state.focus) select(null); fitNodes(visNodes.filter(n => n.comm === k), 1.8); }
+  function highlight() {
+    const f = state.focus && byId.get(state.focus);
+    if (!f) { nodeSel.classed("dim", false).classed("hl", false); edgeSel.classed("dim", false).classed("on", false); return; }
+    const keep = new Set([f.id, ...f.nb, ...(state.showSug ? f.sug : [])]);
+    const touch = d => d.source.id === f.id || d.target.id === f.id;
+    nodeSel.classed("dim", d => !keep.has(d.id)).classed("hl", d => d.id === f.id);
+    edgeSel.classed("dim", d => !touch(d)).classed("on", touch);
+  }
+  // 1 clic : on montre les liens sans toucher à la disposition. Double clic : la fiche est isolée en couronne.
+  function select(id, center, ring = false) {
+    const wasRing = state.ring;
+    state.focus = id; state.ring = !!(id && ring);
+    releaseRing();
+    if (id) { const n = byId.get(id);
+      if (!state.types.has(n.type)) { state.types.add(n.type); if (chips) [...chips.children][typeKeys.indexOf(n.type)].classList.remove("off"); }
+      if (n.deg === 0 && !state.showIso && !(state.showSug && n.sug.size)) isoBtn.click(); else update();
+      if (FULL && id && win.classList.contains("open")) loadFiche(id);
+      const v = viewArea();
+      if (state.ring) {
+        const box = buildRing(n);
+        const k = Math.max(.5, Math.min(1.5, v.H / (box.H + 120), v.W / (2 * box.R + 440)));
+        svg.transition().duration(550).call(zoom.transform, d3.zoomIdentity.translate(v.cx - n.x * k, v.cy - n.y * k).scale(k));
+      } else {
+        if (wasRing) sim.alpha(.4).restart();
+        if (center || offscreen(n, v)) { const k = Math.max(1.2, d3.zoomTransform(svg.node()).k);
+          svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(v.cx - n.x * k, v.cy - n.y * k).scale(k)); }
+      }
+    } else { highlight(); placeLabels(); sim.alpha(.4).restart(); }
+    labelVis(d3.zoomTransform(svg.node()).k);
+    if (bigLink) bigLink.href = BIG + (id ? "#" + id : "");
+    if (FULL) {
+      renderPanel();
+      if (history.replaceState) history.replaceState(null, "", id ? "#" + id : location.pathname + location.search);
+    }
+  }
+  // La fiche choisie est-elle cachée (hors écran ou sous la fenêtre) ?
+  function offscreen(n, v) {
+    const t = d3.zoomTransform(svg.node()), x = t.applyX(n.x), y = t.applyY(n.y);
+    return x < v.x0 + 20 || x > v.x1 - 20 || y < v.y0 + 20 || y > v.y1 - 20;
+  }
+
+  // ---------- Panneau (page complète)
+  const panel = FULL ? $("panel") : null;
+  const item = (n, extra = "") => `<li><span class="sw" style="background:${color(n)}"></span><button class="lnk" data-id="${n.id}">${esc(n.name)}</button>${extra}</li>`;
+  const fmt = x => String(x).replace(".", ",");
+  function renderPanel() {
+    if (!panel) return;
+    if (state.focus) { const n = byId.get(state.focus);
+      const groups = {}; [...n.nb].map(i => byId.get(i)).forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
+      let h = `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
+        <h1 style="margin-top:12px">${esc(n.name)}</h1>
+        <p><span class="tag" style="border-color:${color(n)}">${esc(TYPES[n.type].label)}</span>${n.cat ? `<span class="tag">${esc(n.cat)}</span>` : ""}</p>
+        <div class="acts"><button class="btn" data-read="${n.id}">Lire la fiche</button><a class="btn" href="${esc(url(n))}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a></div>
+        <h2>${n.deg} lien${n.deg > 1 ? "s" : ""}</h2>`;
+      if (!n.deg) h += `<p class="muted">Aucune relation logique. Cette fiche n'est reliée à rien.</p>`;
+      typeKeys.forEach(t => { if (groups[t]) h += `<h3>${esc(TYPES[t].label)} · ${groups[t].length}</h3><ul class="links">${groups[t].sort((a, b) => b.deg - a.deg).map(m => item(m)).join("")}</ul>`; });
+      if (n.sug.size) h += `<h2 style="color:var(--conf)">À ne pas confondre avec</h2><p class="muted" style="margin-top:-4px">Notions proches en apparence mais différentes. Trait rouge dans le graphe.</p><ul class="links">${[...n.sug].map(i => item(byId.get(i))).join("")}</ul>`;
+      panel.innerHTML = h;
+    } else {
+      const hubs = G.nodes.slice().sort((a, b) => b.deg - a.deg).slice(0, 8);
+      const iso = G.nodes.filter(n => n.deg === 0);
+      const bridges = G.nodes.filter(n => new Set([...n.nb].map(i => byId.get(i).type)).size >= 4).sort((a, b) => b.deg - a.deg).slice(0, 12);
+      const same = G.edges.filter(([a, b]) => byId.get(a).type === byId.get(b).type).length;
+      const when = new Date(G.generated).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+      const isoBy = typeKeys.map(t => [t, iso.filter(n => n.type === t)]).filter(([, l]) => l.length);
+      const S = G.stats;
+      panel.innerHTML = `<h1>Réseau des fiches</h1>
+        <p class="muted">Relations entre tes ${typeKeys.length} bases Notion. Clique une fiche pour voir ses liens.</p>
+        <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
+        <h2>Les groupes</h2>
+        <p class="muted">Fiches plus liées entre elles qu'avec le reste (méthode de Louvain). Clique un nom pour zoomer.</p>
+        <ul class="links">${C.map((c, k) => ({ c, k })).filter(o => !o.c.small).map(o => `<li><span class="muted" style="min-width:22px">${o.c.size}</span><button class="lnk" data-comm="${o.k}">${esc(o.c.name)}</button> <span class="muted">${o.c.top.slice(0, 2).map(i => esc(byId.get(i).name)).join(", ")}</span></li>`).join("")}</ul>
+        <p>Modularité ${fmt(S.mod)} (au-dessus de 0,3, les groupes sont bien marqués). Le noyau réunit ${S.giant} fiches, avec ${fmt(Math.round(S.density * 1000) / 10)} % des liens possibles, et jusqu'à ${S.diam} sauts pour le traverser.${S.comps > 1 ? ` ${S.comps - 1} petit${S.comps > 2 ? "s" : ""} îlot${S.comps > 2 ? "s" : ""} vi${S.comps > 2 ? "vent" : "t"} à part.` : ""}</p>
+        <h2>Les plaques tournantes</h2>
+        <p class="muted">Les fiches qui relient le plus de notions.</p>
+        <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
+        ${bridges.length ? `<h2>Les ponts entre 4 bases ou plus</h2><ul class="links">${bridges.map(n => item(n, ` <span class="muted">${new Set([...n.nb].map(i => byId.get(i).type)).size} bases</span>`)).join("")}</ul>` : ""}
+        ${iso.length ? `<h2>Les fiches isolées</h2>${isoBy.map(([t, l]) => `<details><summary>${esc(TYPES[t].label)} · ${l.length}</summary><ul class="links">${l.sort((a, b) => a.name.localeCompare(b.name, "fr")).map(n => item(n)).join("")}</ul></details>`).join("")}` : ""}
+        <h2>Deux sortes de traits</h2>
+        <p class="legend"><span class="swl"></span>Lien logique (${G.edges.length}, dont ${same} dans une même base). Ils forment les groupes.</p>
+        <p class="legend"><span class="swl conf"></span>À ne pas confondre (${G.conf.length}). Ces traits n'influencent ni les groupes ni la disposition.</p>
+        <p class="legend" style="margin-top:14px">Taille d'un point = nombre de liens logiques. Clic : voir les liens. Double clic : isoler la fiche. Molette pour zoomer, glisser pour déplacer.</p>
+        <p class="legend" style="margin-top:14px">Données Notion du ${esc(when)}. Mise à jour automatique toutes les heures.</p>`;
+    }
+    panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
+    panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
+    panel.querySelectorAll("[data-read]").forEach(b => b.onclick = () => openWin(b.dataset.read));
+    const bk = panel.querySelector("[data-back]"); if (bk) bk.onclick = () => select(null);
+  }
+
+  // ---------- Fenêtre de fiche : déplaçable, repliable, suit la fiche sélectionnée
+  const win = FULL ? $("win") : document.createElement("div");
+  const wTitle = FULL && win.querySelector(".wt"), wSw = FULL && win.querySelector(".sw"), wBody = FULL && win.querySelector(".wbody");
+  const wCol = FULL && win.querySelector("[data-collapse]"), wClose = FULL && win.querySelector("[data-close]");
+  const ficheCache = new Map(); let ficheReq = null, shown = null;
+  function openWin(id) { win.classList.add("open"); setCollapsed(false); placeWin(); loadFiche(id); wClose.focus({ preventScroll: true });
+    const n = byId.get(id); if (n && offscreen(n, viewArea())) select(id, true, state.ring); }
+  function closeWin() { win.classList.remove("open"); shown = null; const b = panel.querySelector("[data-read]"); if (b) b.focus(); }
+  function setCollapsed(c) { win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); wCol.setAttribute("aria-label", c ? "Déplier la fiche" : "Replier la fiche"); wCol.textContent = c ? "▸" : "▾"; store.set("reseau-win-collapsed", c); }
+  function placeWin() {
+    const p = store.get("reseau-win-pos");
+    if (p && innerWidth > 760) { win.style.left = Math.min(Math.max(0, p.x), innerWidth - 120) + "px"; win.style.top = Math.min(Math.max(0, p.y), innerHeight - 44) + "px"; }
+  }
+  async function loadFiche(id) {
+    const n = byId.get(id); if (!n || shown === id) return; shown = id;
+    wTitle.textContent = n.name; wSw.style.background = color(n);
+    if (ficheCache.has(id)) return renderFiche(ficheCache.get(id));
+    wBody.innerHTML = `<div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div>`;
+    wBody.setAttribute("aria-busy", "true");
+    if (ficheReq) ficheReq.abort();
+    ficheReq = new AbortController();
+    try {
+      const r = await fetch(API_FICHE(id), { signal: ficheReq.signal });
+      const j = r.ok ? await r.json() : null;
+      if (!r.ok) throw new Error(r.status === 404 ? "Cette fiche sera disponible à la prochaine mise à jour." : "Erreur " + r.status);
+      ficheCache.set(id, j); if (shown === id) renderFiche(j);
+    } catch (e) {
+      if (e.name === "AbortError") return;
+      wBody.removeAttribute("aria-busy");
+      wBody.innerHTML = `<p>Le contenu de cette fiche ne se charge pas.</p><p class="muted">${esc(e.message)}</p><div class="acts"><button class="btn" data-retry>Réessayer</button><a class="btn" href="${esc(url(n))}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a></div>`;
+      wBody.querySelector("[data-retry]").onclick = () => { shown = null; loadFiche(id); };
+    }
+  }
+  function renderFiche(j) {
+    const n = byId.get(j.id);
+    wBody.removeAttribute("aria-busy");
+    const props = j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
+    const body = j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`;
+    wBody.innerHTML = props + body + `<div class="acts" style="margin-top:16px"><a class="btn" href="${esc(url(n))}" target="_blank" rel="noopener">Ouvrir dans Notion ↗</a></div>`;
+    wBody.scrollTop = 0;
+    wBody.querySelectorAll("[data-id]").forEach(b => {
+      if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true);
+      else b.replaceWith(...b.childNodes);
+    });
+  }
+  if (FULL) {
+    wClose.onclick = closeWin;
+    wCol.onclick = () => setCollapsed(!win.classList.contains("collapsed"));
+    if (store.get("reseau-win-collapsed")) setCollapsed(true);
+    win.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); closeWin(); } });
+    const head = win.querySelector(".whead");
+    head.addEventListener("pointerdown", e => {
+      if (e.target.closest("button") || innerWidth <= 760) return;
+      e.preventDefault(); head.setPointerCapture(e.pointerId);
+      const r = win.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+      const move = ev => {
+        const x = Math.min(Math.max(0, ev.clientX - ox), innerWidth - 120), y = Math.min(Math.max(0, ev.clientY - oy), innerHeight - 44);
+        win.style.left = x + "px"; win.style.top = y + "px";
+      };
+      const up = () => { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up);
+        store.set("reseau-win-pos", { x: parseFloat(win.style.left), y: parseFloat(win.style.top) }); };
+      head.addEventListener("pointermove", move); head.addEventListener("pointerup", up);
+    });
+    head.addEventListener("dblclick", e => { if (!e.target.closest("button")) setCollapsed(!win.classList.contains("collapsed")); });
+  }
+
+  // ---------- Lancement
+  update(); renderPanel();
+  sim.stop(); for (let i = 0; i < 350; i++) sim.tick(); sim.on("tick")(); sim.alpha(.05).restart();
+  fitNodes(visNodes, 1.2, 0);
+  addEventListener("resize", () => { if (!state.focus) fitNodes(visNodes, 1.2, 0); });
+  const deep = location.hash.slice(1).replace(/-/g, "").toLowerCase();
+  if (deep && byId.has(deep)) { select(deep, true); if (FULL) openWin(deep); }
+}
+})();
