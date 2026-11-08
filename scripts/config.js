@@ -48,6 +48,6 @@ export const NOMS_GROUPES = {
 // à la publication suivante. Laisse vide pour masquer un bouton.
 // Champs cachés attendus : « type », « fiche » et « lien » (erreur), « liee » (proposition).
 export const FORMULAIRES = {
-  erreur: "",
-  proposition: "",
+  erreur: "https://tally.so/r/laq1Ao",
+  proposition: "https://tally.so/r/PRDe01",
 };
