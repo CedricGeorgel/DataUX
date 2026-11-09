@@ -38,3 +38,9 @@ Sur la carte, les fiches très liées entre elles forment des groupes. Ces group
 - **Clic** sur une fiche : ses liens s'allument.
 - **Double clic** : la fiche est isolée avec ses voisines.
 - **Lire la fiche** : son contenu s'ouvre dans une fenêtre, sans quitter la carte.
+
+---
+
+Images des fiches générées par IA
+
+Site de visualisation généré par IA
