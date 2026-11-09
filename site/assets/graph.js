@@ -259,16 +259,6 @@ function init(G) {
     const boxes = [], hit = b => { for (const o of boxes) { if (b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]) return true; } return false; };
     const circles = visNodes.map(n => ({ id: n.id, b: [n.x - rad(n), n.y - rad(n), n.x + rad(n), n.y + rad(n)] }));
     const onCircle = (b, id, only) => circles.some(c => c.id !== id && (!only || only.has(c.id)) && b[0] < c.b[2] && b[2] > c.b[0] && b[1] < c.b[3] && b[3] > c.b[1]);
-    // noms des groupes d'abord, par taille : au-dessus de la bulle, sinon décalés, sinon masqués
-    const hfs = 13 / k, hpl = new Map();
-    gHulls.selectAll("g.hull").data().slice().sort((a, b) => C[b.k].size - C[a.k].size).forEach(d => {
-      const nm = C[d.k].name.toUpperCase(), w = (textW(nm) * 1.06 + .06 * nm.length) * hfs;
-      for (const lift of [0, hfs * 1.3]) for (const sh of [0, -w / 3, w / 3]) {
-        const y = d.top - 10 / k - lift, x = d.cx + sh, b = [x - w / 2, y - hfs, x + w / 2, y + 2 / k];
-        if (!hit(b) && !onCircle(b, null)) { boxes.push(b); hpl.set(d.k, { x, y }); return; } }
-    });
-    gHulls.selectAll("g.hull text").style("font-size", hfs + "px").style("display", d => hpl.has(d.k) ? null : "none")
-      .attr("x", d => hpl.has(d.k) ? hpl.get(d.k).x : d.cx).attr("y", d => hpl.has(d.k) ? hpl.get(d.k).y : 0);
     const txt = nodeSel.select("text");
     if (state.focus && state.ring) { txt.style("display", d => d.ring ? null : "none"); placeLabels(); return; }
     const fs = 11 / k, h = fs * 1.2, gap = 3 / k;
@@ -304,7 +294,6 @@ function init(G) {
     const sel = gHulls.selectAll("g.hull").data(data, d => d.k).join(enter => {
       const g = enter.append("g").attr("class", "hull");
       g.append("path");
-      g.append("text").attr("text-anchor", "middle").text(d => C[d.k].name).on("click", (e, d) => { e.stopPropagation(); zoomComm(d.k); });
       return g; });
     sel.select("path").attr("d", d => hullLine(d.h));
     sel.classed("dim", !!state.focus);
@@ -387,8 +376,6 @@ function init(G) {
       const when = new Date(G.generated).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
       panel.innerHTML = `<h1>Réseau des fiches</h1>
         <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
-        <h2>Les groupes</h2>
-        <ul class="links">${C.map((c, k) => ({ c, k })).filter(o => !o.c.small).map(o => `<li><span class="muted" style="min-width:22px">${o.c.size}</span><button class="lnk" data-comm="${o.k}">${esc(o.c.name)}</button></li>`).join("")}</ul>
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
