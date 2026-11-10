@@ -60,18 +60,19 @@ function init(G) {
   const cRank = new Map();
   G.nodes.forEach(n => [...n.sug].sort((x, y) => cForce([n.id, y]) - cForce([n.id, x]) || byId.get(x).deg - byId.get(y).deg)
     .forEach((m, i) => { const k = eKey(n.id, m), r = cRank.get(k) || [Infinity, -1]; cRank.set(k, [Math.min(r[0], i), Math.max(r[1], i)]); }));
-  const edgeCap = k => k < .45 ? 1 : k < .7 ? 2 : k < 1 ? 4 : k < 1.4 ? 8 : Infinity;
-  // Très loin : seulement les confusions qui sont la principale pour les 2 fiches. Puis la principale d'une fiche, puis 2, puis toutes.
-  // On ne garde aussi que celles dont une des 2 fiches a son nom affiché à ce niveau de zoom (même seuil que les noms).
+  // Très loin : seules les confusions principales des 2 fiches restent nettes. Puis la principale d'une fiche, puis 2, puis toutes.
+  // On ne garde nettes aussi que celles dont une des 2 fiches a son nom affiché à ce niveau de zoom (même seuil que les noms).
   const labelMin = k => k < 0.55 ? 9 : k < 0.8 ? 6 : k < 1.1 ? 4 : 0;
   const confShown = (r, k, d) => k >= 1.1 || (Math.max(eNode(d.source).deg, eNode(d.target).deg) >= labelMin(k)
     && (k < .45 ? r[1] < 1 : k < .7 ? r[0] < 1 : r[0] < 2));
-  let curCap = null;
-  function edgeVis(k, force) {
-    const cap = edgeCap(k) + "|" + (k < .45 ? 0 : k < .55 ? 1 : k < .7 ? 2 : k < .8 ? 3 : k < 1 ? 4 : k < 1.1 ? 5 : 6); if (!edgeSel || (!force && cap === curCap)) return; curCap = cap;
-    const ec = edgeCap(k);
-    edgeSel.classed("far", d => { const key = eKey(eId(d.source), eId(d.target));
-      return d.sug ? !confShown(cRank.get(key) || [0, 0], k, d) : eRank.get(key) >= ec; });
+  // Les liens ne disparaissent pas : ils s'estompent selon leur rang et reprennent de la netteté en zoomant.
+  // Nombre de liens nets par fiche : 1 de loin, environ 2 à k = 0,7, 4 à k = 1, 11 à k = 1,4.
+  function edgeVis(k) {
+    if (!edgeSel) return;
+    const c = Math.max(1, Math.pow(2, (k - .45) / .27));
+    edgeSel.style("--f", d => { const key = eKey(eId(d.source), eId(d.target));
+      if (d.sug) return confShown(cRank.get(key) || [0, 0], k, d) ? 1 : Math.max(.08, Math.min(1, k - .15)).toFixed(3);
+      const r = eRank.get(key); return r < c ? 1 : Math.max(.05, Math.pow(c / (r + 1), 1.5)).toFixed(3); });
   }
   const state = { ring: false, types: new Set(typeKeys), showIso: true, showSug: true, focus: null };
   const color = n => TYPES[n.type].color;
@@ -250,7 +251,7 @@ function init(G) {
     });
     nodeSel.sort((a, b) => a.deg - b.deg);
     sim.nodes(visNodes); sim.force("link").links(visEdges); sim.alpha(.8).restart();
-    paint(); placeLabels(); labelVis(d3.zoomTransform(svg.node()).k); edgeVis(d3.zoomTransform(svg.node()).k, true); highlight();
+    paint(); placeLabels(); labelVis(d3.zoomTransform(svg.node()).k); edgeVis(d3.zoomTransform(svg.node()).k); highlight();
   }
   function placeLabels() { if (!nodeSel) return;
     nodeSel.select("text")

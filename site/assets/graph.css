@@ -60,8 +60,9 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .node{cursor:pointer}
 .edge{stroke:var(--edge);stroke-opacity:.62}
 .edge.cross{stroke-opacity:.32}
-.edge{transition:opacity .25s}
-.edge.far:not(.on){opacity:0}
+.edge{opacity:var(--f,1)}
+.edge.dim{opacity:calc(var(--f,1) * .12)}
+.edge.on{opacity:1}
 .hull path{fill:var(--ink);fill-opacity:.016;stroke:var(--edge);stroke-opacity:.3;stroke-dasharray:3 4}
 .hull text{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;fill:var(--muted);cursor:pointer;paint-order:stroke;stroke:var(--bg);stroke-width:4px}
 .hull text:hover{fill:var(--ink)}
