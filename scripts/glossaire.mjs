@@ -9,7 +9,7 @@ if (!TOKEN) { console.error("NOTION_TOKEN manquant."); process.exit(1); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let last = 0;
 async function notion(method, p, body) {
-  for (let attempt = 0; attempt < 6; attempt++) {
+  for (let attempt = 0; attempt < 10; attempt++) {
     const wait = last + 350 - Date.now(); if (wait > 0) await sleep(wait);
     last = Date.now();
     let res;
@@ -18,7 +18,7 @@ async function notion(method, p, body) {
         headers: { Authorization: "Bearer " + TOKEN, "Notion-Version": NOTION_VERSION, "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body) });
     } catch (e) { await sleep(1000 * (attempt + 1)); continue; }
-    if (res.status === 429 || res.status >= 500) { await sleep(2000); continue; }
+    if (res.status === 429 || res.status >= 500) { await sleep(1000 * Math.min(30, (+res.headers.get("retry-after") || 2) * (attempt + 1))); continue; }
     const data = await res.json().catch(() => ({}));
     if (res.status >= 400) { const e = new Error(data.message || "erreur " + res.status); e.status = res.status; throw e; }
     return data;
@@ -56,7 +56,8 @@ for (const base of BASES) {
         if (pr.type === "title") name = (pr.title || []).map(x => x.plain_text).join("");
         if (pr.type === "rich_text" && pr.rich_text.length) props[pn] = runs(pr.rich_text);
       }
-      lines.push(JSON.stringify({ id: nid(page.id), base: base.key, name, props, blocks: await blocks(page.id) }));
+      let bl = []; try { bl = await blocks(page.id); } catch (e) { console.warn("Fiche non lue :", name, e.message); }
+      lines.push(JSON.stringify({ id: nid(page.id), base: base.key, name, props, blocks: bl }));
     }
     cursor = r.has_more ? r.next_cursor : null;
   } while (cursor);
