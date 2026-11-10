@@ -156,7 +156,9 @@ function couper(rich, i, start, end, url) {
   rich.splice(i, 1, ...out);
 }
 // Format accepté par l'API pour réécrire un bloc
-const propre = r => r.type === "text" ? { type: "text", text: { content: r.text.content, link: r.text.link || null }, annotations: r.annotations }
+// Les liens internes relus par l'API sont relatifs (« /p/… ») : on les remet en adresse complète pour pouvoir réécrire
+const absolu = l => !l ? null : { url: /^\//.test(l.url) ? "https://www.notion.so" + l.url.replace(/^\/p\//, "/") : l.url };
+const propre = r => r.type === "text" ? { type: "text", text: { content: r.text.content, link: absolu(r.text.link) }, annotations: r.annotations }
   : r.type === "mention" ? { type: "mention", mention: r.mention, annotations: r.annotations }
   : { type: "equation", equation: r.equation, annotations: r.annotations };
 
