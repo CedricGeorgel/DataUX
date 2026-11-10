@@ -570,7 +570,7 @@ function init(G) {
         <li><span class="swl conf"></span>À ne pas confondre</li>
         ${G.bases.map(b => `<li><span class="dot" style="background:${b.color}"></span>${esc(b.one || b.label)}</li>`).join("")}
       </ul>
-      ${MOB() ? `<ul class="leg help"><li>Toucher : ouvrir la fiche.</li><li>Double toucher : isoler la fiche.</li><li>Pincer pour voir plus de liens.</li></ul>`
+      ${MOB() ? `<ul class="leg help"><li>Toucher : ouvrir la fiche.</li><li>Pincer pour voir plus de liens.</li></ul>`
         : `<ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Zoomer pour voir plus de liens, glisser pour déplacer.</li></ul>`}`;
     const setL = c => { lw.classList.toggle("collapsed", c); lc.setAttribute("aria-expanded", !c); lc.setAttribute("aria-label", c ? "Déplier la légende" : "Replier la légende"); lc.textContent = c ? "▸" : "▾"; store.set("reseau-legend-collapsed", c); };
     lc.onclick = () => setL(!lw.classList.contains("collapsed"));
