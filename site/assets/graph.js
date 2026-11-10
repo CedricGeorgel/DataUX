@@ -43,6 +43,23 @@ function init(G) {
   G.edges.forEach(([a, b]) => { byId.get(a).nb.add(b); byId.get(b).nb.add(a); });
   G.conf.forEach(([a, b]) => { byId.get(a).sug.add(b); byId.get(b).sug.add(a); });
   G.nodes.forEach(n => n.deg = n.nb.size);
+
+  // ---------- Densité des liens selon le zoom
+  // Chaque fiche classe ses liens du plus fort au plus faible : voisins communs, même groupe,
+  // puis la notion la plus spécifique. Au dézoom on ne garde que les meilleurs liens de chaque fiche.
+  const eKey = (a, b) => a < b ? a + "|" + b : b + "|" + a;
+  const eId = x => x.id || x;
+  const eForce = new Map(G.edges.map(([a, b]) => { const A = byId.get(a), B = byId.get(b); let s = 0;
+    A.nb.forEach(x => { if (B.nb.has(x)) s++; }); return [eKey(a, b), s + (A.comm === B.comm && A.comm >= 0 ? 2 : 0)]; }));
+  const eRank = new Map();
+  G.nodes.forEach(n => [...n.nb].sort((x, y) => eForce.get(eKey(n.id, y)) - eForce.get(eKey(n.id, x)) || byId.get(x).deg - byId.get(y).deg)
+    .forEach((m, i) => { const k = eKey(n.id, m); eRank.set(k, Math.min(eRank.get(k) ?? Infinity, i)); }));
+  const edgeCap = k => k < .45 ? 1 : k < .7 ? 2 : k < 1 ? 4 : k < 1.4 ? 8 : Infinity;
+  let curCap = null;
+  function edgeVis(k, force) {
+    const cap = edgeCap(k); if (!edgeSel || (!force && cap === curCap)) return; curCap = cap;
+    edgeSel.classed("far", d => !d.sug && eRank.get(eKey(eId(d.source), eId(d.target))) >= cap);
+  }
   const state = { ring: false, types: new Set(typeKeys), showIso: true, showSug: true, focus: null };
   const color = n => TYPES[n.type].color;
 
@@ -113,7 +130,7 @@ function init(G) {
   const svg = d3.select("#svg"); svg.selectAll("*").remove();
   const root = svg.append("g");
   const gHulls = root.append("g"), gEdges = root.append("g"), gNodes = root.append("g");
-  const zoom = d3.zoom().scaleExtent([.15, 5]).on("zoom", e => { root.attr("transform", e.transform); labelVis(e.transform.k); });
+  const zoom = d3.zoom().scaleExtent([.15, 5]).on("zoom", e => { root.attr("transform", e.transform); labelVis(e.transform.k); edgeVis(e.transform.k); });
   svg.call(zoom).on("dblclick.zoom", null);
   svg.on("click", e => { if (e.target === svg.node()) select(null); });
 
@@ -214,7 +231,7 @@ function init(G) {
     });
     nodeSel.sort((a, b) => a.deg - b.deg);
     sim.nodes(visNodes); sim.force("link").links(visEdges); sim.alpha(.8).restart();
-    paint(); placeLabels(); labelVis(d3.zoomTransform(svg.node()).k); highlight();
+    paint(); placeLabels(); labelVis(d3.zoomTransform(svg.node()).k); edgeVis(d3.zoomTransform(svg.node()).k, true); highlight();
   }
   function placeLabels() { if (!nodeSel) return;
     nodeSel.select("text")
@@ -373,14 +390,16 @@ function init(G) {
     } else {
       const hubs = G.nodes.slice().sort((a, b) => b.deg - a.deg).slice(0, 8);
       const iso = G.nodes.filter(n => n.deg === 0);
-      const when = new Date(G.generated).toLocaleString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+      const when = new Date(G.generated).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
       panel.innerHTML = `<h1>Réseau des fiches</h1>
         <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
-        ${G.forms && G.forms.proposition ? `<h2>Contribuer</h2><p class="muted">Une notion manque ? Propose-la, elle sera relue avant d'être ajoutée.</p><div class="acts"><a class="btn" href="${esc(formUrl(G.forms.proposition, {}))}" target="_blank" rel="noopener noreferrer">Proposer une fiche ou une base</a></div>` : ""}
-        <p class="legend" style="margin-top:18px">Données Notion du ${esc(when)}. Mise à jour automatique toutes les heures.</p>`;
+        <div class="pfoot">
+          ${G.forms && G.forms.proposition ? `<a class="btn" href="${esc(formUrl(G.forms.proposition, {}))}" target="_blank" rel="noopener noreferrer">Proposer une fiche ou une base</a>` : ""}
+          <p class="legend">Dernière mise à jour ${esc(when)}</p>
+        </div>`;
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
     panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
@@ -473,7 +492,7 @@ function init(G) {
         <li><span class="swl conf"></span>À ne pas confondre</li>
         ${G.bases.map(b => `<li><span class="dot" style="background:${b.color}"></span>${esc(b.one || b.label)}</li>`).join("")}
       </ul>
-      <ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Molette pour zoomer, glisser pour déplacer.</li></ul>`;
+      <ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Zoomer pour voir plus de liens, glisser pour déplacer.</li></ul>`;
     const setL = c => { lw.classList.toggle("collapsed", c); lc.setAttribute("aria-expanded", !c); lc.setAttribute("aria-label", c ? "Déplier la légende" : "Replier la légende"); lc.textContent = c ? "▸" : "▾"; store.set("reseau-legend-collapsed", c); };
     lc.onclick = () => setL(!lw.classList.contains("collapsed"));
     lw.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setL(!lw.classList.contains("collapsed")); });

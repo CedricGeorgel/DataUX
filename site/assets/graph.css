@@ -25,7 +25,10 @@ body.nopanel .bar{right:60px}
 .btn:hover,.chip:hover{border-color:var(--muted)}
 .chip:focus-visible,.btn:focus-visible,input:focus-visible,.lnk:focus-visible,.node:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 aside{position:fixed;top:12px;right:12px;bottom:12px;width:348px;background:var(--surface);border:1px solid var(--line);
- border-radius:12px;padding:16px 18px;overflow:auto;z-index:3}
+ border-radius:12px;padding:16px 18px;overflow:auto;z-index:3;display:flex;flex-direction:column}
+aside>*{flex:none}
+.pfoot{margin-top:auto;padding-top:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.pfoot .legend{margin:0}
 aside h1{font-size:16px;margin:0 0 2px}
 aside h2{font-size:13px;margin:18px 0 6px}
 aside h3{font-size:12px;margin:12px 0 4px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
@@ -46,6 +49,8 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .node{cursor:pointer}
 .edge{stroke:var(--edge);stroke-opacity:.62}
 .edge.cross{stroke-opacity:.32}
+.edge{transition:opacity .25s}
+.edge.far:not(.on){opacity:0}
 .hull path{fill:var(--ink);fill-opacity:.016;stroke:var(--edge);stroke-opacity:.3;stroke-dasharray:3 4}
 .hull text{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;fill:var(--muted);cursor:pointer;paint-order:stroke;stroke:var(--bg);stroke-width:4px}
 .hull text:hover{fill:var(--ink)}
