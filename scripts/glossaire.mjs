@@ -27,6 +27,12 @@ const FORMES = {
   "Pipeline": [],
   "Direction artistique (DA)": ["Direction artistique"],
   "Design doc (GDD)": ["Design doc", "GDD", "Game Design Document"],
+  "Recherche qualitative et quantitative": ["recherche qualitative", "recherche quantitative", "qualitatif", "quantitatif", "qualitative", "quantitative"],
+  "Discovery et delivery": ["discovery", "delivery"],
+  "B2B et B2C": ["B2B", "B2C"],
+  "Tâche (scénario de test)": ["scénario de test"],   // « tâche » seul est trop courant
+  "Product Owner (PO)": ["Product Owner"],
+  "Product Manager (PM)": ["Product Manager"],
 };
 const ZONES = new Set(["paragraph", "bulleted_list_item", "numbered_list_item", "quote", "callout", "toggle", "to_do"]);
 
