@@ -49,16 +49,29 @@ function init(G) {
   // puis la notion la plus spécifique. Au dézoom on ne garde que les meilleurs liens de chaque fiche.
   const eKey = (a, b) => a < b ? a + "|" + b : b + "|" + a;
   const eId = x => x.id || x;
+  const eNode = x => x.id ? x : byId.get(x);
   const eForce = new Map(G.edges.map(([a, b]) => { const A = byId.get(a), B = byId.get(b); let s = 0;
     A.nb.forEach(x => { if (B.nb.has(x)) s++; }); return [eKey(a, b), s + (A.comm === B.comm && A.comm >= 0 ? 2 : 0)]; }));
   const eRank = new Map();
   G.nodes.forEach(n => [...n.nb].sort((x, y) => eForce.get(eKey(n.id, y)) - eForce.get(eKey(n.id, x)) || byId.get(x).deg - byId.get(y).deg)
     .forEach((m, i) => { const k = eKey(n.id, m); eRank.set(k, Math.min(eRank.get(k) ?? Infinity, i)); }));
+  // Même principe pour « À ne pas confondre » : rang min (le meilleur des 2 fiches) et rang max (le pire).
+  const cForce = ([a, b]) => { const A = byId.get(a), B = byId.get(b); let s = 0; A.nb.forEach(x => { if (B.nb.has(x)) s++; }); return s; };
+  const cRank = new Map();
+  G.nodes.forEach(n => [...n.sug].sort((x, y) => cForce([n.id, y]) - cForce([n.id, x]) || byId.get(x).deg - byId.get(y).deg)
+    .forEach((m, i) => { const k = eKey(n.id, m), r = cRank.get(k) || [Infinity, -1]; cRank.set(k, [Math.min(r[0], i), Math.max(r[1], i)]); }));
   const edgeCap = k => k < .45 ? 1 : k < .7 ? 2 : k < 1 ? 4 : k < 1.4 ? 8 : Infinity;
+  // Très loin : seulement les confusions qui sont la principale pour les 2 fiches. Puis la principale d'une fiche, puis 2, puis toutes.
+  // On ne garde aussi que celles dont une des 2 fiches a son nom affiché à ce niveau de zoom (même seuil que les noms).
+  const labelMin = k => k < 0.55 ? 9 : k < 0.8 ? 6 : k < 1.1 ? 4 : 0;
+  const confShown = (r, k, d) => k >= 1.1 || (Math.max(eNode(d.source).deg, eNode(d.target).deg) >= labelMin(k)
+    && (k < .45 ? r[1] < 1 : k < .7 ? r[0] < 1 : r[0] < 2));
   let curCap = null;
   function edgeVis(k, force) {
-    const cap = edgeCap(k); if (!edgeSel || (!force && cap === curCap)) return; curCap = cap;
-    edgeSel.classed("far", d => !d.sug && eRank.get(eKey(eId(d.source), eId(d.target))) >= cap);
+    const cap = edgeCap(k) + "|" + (k < .45 ? 0 : k < .55 ? 1 : k < .7 ? 2 : k < .8 ? 3 : k < 1 ? 4 : k < 1.1 ? 5 : 6); if (!edgeSel || (!force && cap === curCap)) return; curCap = cap;
+    const ec = edgeCap(k);
+    edgeSel.classed("far", d => { const key = eKey(eId(d.source), eId(d.target));
+      return d.sug ? !confShown(cRank.get(key) || [0, 0], k, d) : eRank.get(key) >= ec; });
   }
   const state = { ring: false, types: new Set(typeKeys), showIso: true, showSug: true, focus: null };
   const color = n => TYPES[n.type].color;
