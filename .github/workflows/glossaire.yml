@@ -1,0 +1,21 @@
+name: Glossaire
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  glossaire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Exporter le texte des fiches
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: node scripts/glossaire.mjs export --log
