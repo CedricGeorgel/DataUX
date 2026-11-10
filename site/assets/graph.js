@@ -490,14 +490,23 @@ function init(G) {
     wTitle.textContent = p.name; wSw.style.background = "var(--muted)";
     const fs = p.fiches.map(i => byId.get(i)).filter(Boolean)
       .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
-    const links = p.links.map(l => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("");
+    const ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
+    const photo = p.photo ? `<img class="pphoto" src="${esc(p.photo)}" alt="">` : `<span class="pphoto ini" aria-hidden="true">${esc(ini)}</span>`;
+    const since = p.since ? new Date(p.since).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) : "";
+    const links = (p.links || []).map(l => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("");
     wBody.removeAttribute("aria-busy");
-    wBody.innerHTML = `${p.job ? `<p class="muted" style="margin-top:0">${esc(p.job)}</p>` : ""}
+    wBody.innerHTML = `<div class="phead">${photo}<div>
+        <div class="pname">${esc(p.name)}</div>
+        ${p.job ? `<div class="muted">${esc(p.job)}</div>` : ""}
+        ${(p.tags || []).length ? `<p class="ptags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>` : ""}
+      </div></div>
       ${links ? `<div class="acts">${links}</div>` : ""}
-      <h4 style="margin:16px 0 6px">${fs.length} fiche${fs.length > 1 ? "s" : ""} relue${fs.length > 1 ? "s" : ""}</h4>
-      <ul class="links">${fs.map(n => item(n)).join("")}</ul>`;
+      ${p.bio ? `<div class="pbio">${p.bio}</div>` : ""}
+      ${since ? `<p class="muted" style="font-size:12px">Contributeur depuis ${esc(since)}</p>` : ""}
+      <details class="pfiches"><summary>${fs.length} fiche${fs.length > 1 ? "s" : ""} relue${fs.length > 1 ? "s" : ""}</summary>
+        <ul class="links">${fs.map(n => item(n)).join("")}</ul></details>`;
     wBody.scrollTop = 0;
-    wBody.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
+    wBody.querySelectorAll("[data-id]").forEach(b => { if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true); else b.replaceWith(...b.childNodes); });
   }
   if (FULL) {
     win.classList.add("empty");

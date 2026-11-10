@@ -180,3 +180,15 @@ ul.leg .dot{width:10px;height:10px;border-radius:50%;flex:none;margin:0 5px}
   .whead{cursor:default}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.phead{display:flex;gap:14px;align-items:center;margin:2px 0 12px}
+.pphoto{width:64px;height:64px;border-radius:50%;object-fit:cover;flex:none;border:1px solid var(--line)}
+.pphoto.ini{display:inline-flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-weight:600;font-size:20px}
+.pname{font-size:17px;font-weight:600;line-height:1.25}
+.ptags{margin:6px 0 0}
+.pbio{margin:14px 0}
+.pbio p{margin:0 0 8px}
+.pfiches{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+.pfiches summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--muted)}
+.pfiches summary:hover{color:var(--ink)}
+.pfiches ul{margin-top:8px}

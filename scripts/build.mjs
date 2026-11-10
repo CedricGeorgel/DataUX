@@ -319,15 +319,40 @@ try {
     for (const page of r.results || []) {
       const t = Object.values(page.properties || {}).find(p => p.type === "title");
       if (!t || page.in_trash || page.archived) continue;
-      // Fiche contributeur : nom, métier (premier texte) et liens (propriétés URL, https ajouté si absent)
-      const person = { name: plain(t.title), job: "", links: [] };
-      for (const [pname, pr] of Object.entries(page.properties || {})) {
-        if (pr.type === "rich_text" && !person.job) person.job = plain(pr.rich_text);
+      // Fiche contributeur : tout ce qui présente la personne. Les fiches relues viennent des relations.
+      const person = { name: plain(t.title), job: "", bio: "", tags: [], since: "", photo: "", links: [] };
+      const props = Object.entries(page.properties || {});
+      // Case « Profil public » (ou « Affichage », « Consentement ») décochée : on ne publie que le nom
+      const consent = props.find(([n, pr]) => pr.type === "checkbox" && /public|affich|consent/i.test(n));
+      const open = !consent || consent[1].checkbox;
+      const texts = [];
+      for (const [pname, pr] of open ? props : []) {
+        if (pr.type === "rich_text" && plain(pr.rich_text)) {
+          if (!person.job && /job|m[ée]tier|poste|r[ôo]le|fonction/i.test(pname)) person.job = plain(pr.rich_text);
+          else texts.push(richHtml(pr.rich_text));
+        }
+        if ((pr.type === "select" || pr.type === "multi_select" || pr.type === "status")) person.tags.push(...propText(pr).split(", ").filter(Boolean));
+        if (pr.type === "date" && pr.date && !person.since) person.since = pr.date.start;
         if (pr.type === "url" && pr.url) {
           const u = /^[a-z]+:/i.test(pr.url) ? pr.url : "https://" + pr.url.replace(/^\/+/, "");
           if (/^https:\/\/[^\s"'<>]+$/.test(u)) person.links.push({ label: pname.trim(), url: u });
         }
+        if (pr.type === "files" && !person.photo) {
+          const f = (pr.files || []).find(x => x.file || x.external);
+          if (f) person.photo = await saveImage({ id: "p" + pub(nid(page.id)), src: (f.file || f.external).url }) || "";
+        }
       }
+      if (open) {
+        // Photo : propriété Fichiers, sinon l'icône de la page si c'est une image
+        const ic = page.icon && (page.icon.file || page.icon.external);
+        if (!person.photo && ic) person.photo = await saveImage({ id: "p" + pub(nid(page.id)), src: ic.url }) || "";
+        // Description : textes des propriétés puis contenu de la page (sans images)
+        let body = "";
+        try { body = blocksHtml(await children(page.id, 0, { calls: 5 }), []).replace(/<!--img\d+-->[\s\S]*?<!--\/img\d+-->/g, ""); } catch (e) {}
+        person.bio = texts.map(x => `<p>${x}</p>`).join("") + body;
+      }
+      // LinkedIn en premier
+      person.links.sort((x, y) => /linkedin/i.test(y.url) - /linkedin/i.test(x.url));
       people.set(nid(page.id), person);
     }
     cursor = r.has_more ? r.next_cursor : null;
@@ -365,7 +390,7 @@ const pubGraph = {
   conf: graph.conf.map(([a, b]) => [pub(a), pub(b)]),
   comms: comms.map(c => ({ ...c, top: c.top.map(pub) })),
   // Contributeurs : profil public et fiches relues
-  people: [...people].map(([cid, p]) => ({ id: pub(cid), name: p.name, job: p.job, links: p.links,
+  people: [...people].map(([cid, p]) => ({ id: pub(cid), ...p,
     fiches: [...contrib].filter(([fid, cs]) => nodes.has(fid) && cs.includes(cid)).map(([fid]) => pub(fid)) }))
     .filter(p => p.fiches.length).sort((a, b) => b.fiches.length - a.fiches.length || a.name.localeCompare(b.name, "fr")),
 };
