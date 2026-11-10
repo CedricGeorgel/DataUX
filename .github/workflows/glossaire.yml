@@ -1,10 +1,22 @@
 name: Glossaire
 
+# Relie les termes du glossaire cités dans le texte des fiches.
+# Bouton « Run workflow » : « rapport » pour voir sans rien modifier, « appliquer » pour écrire dans Notion.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "rapport (ne modifie rien), appliquer (écrit dans Notion) ou export (texte des fiches dans le journal)"
+        default: rapport
+        type: choice
+        options: [rapport, appliquer, export]
 
 permissions:
   contents: read
+
+concurrency:
+  group: glossaire
+  cancel-in-progress: false
 
 jobs:
   glossaire:
@@ -15,7 +27,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Exporter le texte des fiches
+      - name: Relier les termes du glossaire
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-        run: node scripts/glossaire.mjs export --log
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$MODE" = "appliquer" ]; then node scripts/glossaire.mjs --write
+          elif [ "$MODE" = "export" ]; then node scripts/glossaire.mjs export --log
+          else node scripts/glossaire.mjs; fi

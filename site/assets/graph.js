@@ -74,7 +74,9 @@ function init(G) {
       if (d.sug) return confShown(cRank.get(key) || [0, 0], k, d) ? 1 : Math.max(.08, Math.min(1, k - .15)).toFixed(3);
       const r = eRank.get(key); return r < c ? 1 : Math.max(.05, Math.pow(c / (r + 1), 1.5)).toFixed(3); });
   }
-  const state = { ring: false, types: new Set(typeKeys), showIso: true, showSug: true, focus: null };
+  // Glossaire et bibliographie masqués au départ : ce sont des fiches de référence, pas des notions à explorer
+  const HIDDEN = ["glossaire", "biblio"];
+  const state = { ring: false, types: new Set(typeKeys.filter(t => !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null };
   const color = n => TYPES[n.type].color;
 
   // ---------- Barre de filtres (page complète)
@@ -108,7 +110,7 @@ function init(G) {
       panelBtn.setAttribute("aria-label", l); panelBtn.title = l; panelBtn.setAttribute("aria-expanded", !closed); fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 400); };
     chips = $("chips");
     typeKeys.forEach(t => {
-      const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
+      const b = document.createElement("button"); b.className = "chip" + (state.types.has(t) ? "" : " off"); b.setAttribute("aria-pressed", state.types.has(t));
       b.title = TYPES[t].label;
       b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span><span class="full">${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span></span><span class="short">${esc(TYPES[t].label.replace(/^Fiches\s+/, "").split(" ")[0])}</span>`;
       b.onclick = () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); b.classList.toggle("off", !state.types.has(t)); b.setAttribute("aria-pressed", state.types.has(t)); state.focus ? select(state.focus, false, state.ring) : update(); };
