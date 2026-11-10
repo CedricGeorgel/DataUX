@@ -160,7 +160,8 @@ for (const base of BASES) {
       const rich = b[b.type].rich_text.map(propre);
       let modifie = false;
       for (const t of termes) {
-        if (fait.has(t.id)) continue;
+        // Une fiche dont le nom contient le terme l'emploie dans son sens à elle (« sprint » dans « Design sprint »)
+        if (fait.has(t.id) || name.toLowerCase().includes(t.forme.toLowerCase())) continue;
         for (let i = 0; i < rich.length; i++) {
           const r = rich[i];
           if (r.type !== "text" || r.text.link || r.annotations.code) continue;
