@@ -465,7 +465,9 @@ function init(G) {
     wBody.removeAttribute("aria-busy");
     const props = j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
     const body = j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`;
-    const who = j.contributors && j.contributors.length ? j.contributors.map(esc).join(", ") : `<span class="muted">Personne pour l'instant</span>`;
+    const who = j.contributors && j.contributors.length ? j.contributors.map(c => typeof c === "string" ? esc(c)
+      : peopleById.has(c.id) ? `<button class="lnk" data-person="${esc(c.id)}">${esc(c.name)}</button>` : esc(c.name)).join(", ")
+      : `<span class="muted">Personne pour l'instant</span>`;
     const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.id;
     const acts = [
       F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
@@ -477,6 +479,25 @@ function init(G) {
       if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true);
       else b.replaceWith(...b.childNodes);
     });
+    wBody.querySelectorAll("[data-person]").forEach(b => b.onclick = () => showPerson(b.dataset.person));
+  }
+  // Fiche d'un contributeur : métier, liens et fiches relues (cliquables)
+  const peopleById = new Map((G.people || []).map(p => [p.id, p]));
+  function showPerson(pid) {
+    const p = peopleById.get(pid); if (!p || !FULL) return;
+    if (ficheReq) ficheReq.abort();
+    shown = "person:" + pid; win.classList.remove("empty"); setCollapsed(false);
+    wTitle.textContent = p.name; wSw.style.background = "var(--muted)";
+    const fs = p.fiches.map(i => byId.get(i)).filter(Boolean)
+      .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
+    const links = p.links.map(l => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("");
+    wBody.removeAttribute("aria-busy");
+    wBody.innerHTML = `${p.job ? `<p class="muted" style="margin-top:0">${esc(p.job)}</p>` : ""}
+      ${links ? `<div class="acts">${links}</div>` : ""}
+      <h4 style="margin:16px 0 6px">${fs.length} fiche${fs.length > 1 ? "s" : ""} relue${fs.length > 1 ? "s" : ""}</h4>
+      <ul class="links">${fs.map(n => item(n)).join("")}</ul>`;
+    wBody.scrollTop = 0;
+    wBody.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
   }
   if (FULL) {
     win.classList.add("empty");

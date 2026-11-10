@@ -318,7 +318,17 @@ try {
     const r = await notion("POST", `/data_sources/${src}/query`, body);
     for (const page of r.results || []) {
       const t = Object.values(page.properties || {}).find(p => p.type === "title");
-      if (t && !page.in_trash && !page.archived) people.set(nid(page.id), plain(t.title));
+      if (!t || page.in_trash || page.archived) continue;
+      // Fiche contributeur : nom, métier (premier texte) et liens (propriétés URL, https ajouté si absent)
+      const person = { name: plain(t.title), job: "", links: [] };
+      for (const [pname, pr] of Object.entries(page.properties || {})) {
+        if (pr.type === "rich_text" && !person.job) person.job = plain(pr.rich_text);
+        if (pr.type === "url" && pr.url) {
+          const u = /^[a-z]+:/i.test(pr.url) ? pr.url : "https://" + pr.url.replace(/^\/+/, "");
+          if (/^https:\/\/[^\s"'<>]+$/.test(u)) person.links.push({ label: pname.trim(), url: u });
+        }
+      }
+      people.set(nid(page.id), person);
     }
     cursor = r.has_more ? r.next_cursor : null;
   } while (cursor);
@@ -354,13 +364,18 @@ const pubGraph = {
   edges: graph.edges.map(([a, b]) => [pub(a), pub(b)]),
   conf: graph.conf.map(([a, b]) => [pub(a), pub(b)]),
   comms: comms.map(c => ({ ...c, top: c.top.map(pub) })),
+  // Contributeurs : profil public et fiches relues
+  people: [...people].map(([cid, p]) => ({ id: pub(cid), name: p.name, job: p.job, links: p.links,
+    fiches: [...contrib].filter(([fid, cs]) => nodes.has(fid) && cs.includes(cid)).map(([fid]) => pub(fid)) }))
+    .filter(p => p.fiches.length).sort((a, b) => b.fiches.length - a.fiches.length || a.name.localeCompare(b.name, "fr")),
 };
 await fs.writeFile(path.join(OUT, "graph.json"), JSON.stringify(pubGraph));
 console.log(`Graphe : ${list.length} fiches, ${E.length} liens, ${graph.conf.length} confusions, ${comms.length} groupes`);
 
 let n = 0, failed = 0;
 for (const [id, page] of pages) {
-  const who = [...new Set((contrib.get(id) || []).map(c => people.get(c)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  const who = [...new Set(contrib.get(id) || [])].filter(c => people.has(c)).map(c => ({ id: pub(c), name: people.get(c).name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
   try {
     const f = await fiche(id, page, who);
     f.id = pub(id);
