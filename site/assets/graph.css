@@ -58,8 +58,8 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .node circle{stroke:var(--surface);stroke-width:1.5}
 .node text{font-size:10.5px;fill:var(--ink);pointer-events:none;paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}
 .node{cursor:pointer}
-.edge{stroke:var(--edge);stroke-opacity:.62}
-.edge.cross{stroke-opacity:.32}
+.edge{stroke:var(--edge);stroke-opacity:.38}
+.edge.cross{stroke-opacity:.2}
 .edge{opacity:var(--f,1)}
 .edge.dim{opacity:calc(var(--f,1) * .12)}
 .edge.on{opacity:1}
@@ -68,8 +68,8 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .hull text:hover{fill:var(--ink)}
 .hull.dim{opacity:.05}
 .edge.on{stroke:var(--ink);stroke-opacity:.75;stroke-width:1.4}
-.edge.sug{stroke:var(--conf)}
-.edge.sug.on{stroke:var(--conf)}
+.edge.sug{stroke:var(--conf);stroke-opacity:.5}
+.edge.sug.on{stroke:var(--conf);stroke-opacity:.85}
 .swl{display:inline-block;width:22px;height:0;border-top:1.5px solid var(--edge);vertical-align:middle;margin-right:6px}
 .swl.conf{border-top-color:var(--conf)}
 .dim{opacity:.08}

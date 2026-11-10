@@ -110,7 +110,7 @@ function init(G) {
     typeKeys.forEach(t => {
       const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
       b.title = TYPES[t].label;
-      b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span><span class="full">${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span></span><span class="short">${esc(TYPES[t].label.split(" ")[0])}</span>`;
+      b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span><span class="full">${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span></span><span class="short">${esc(TYPES[t].label.replace(/^Fiches\s+/, "").split(" ")[0])}</span>`;
       b.onclick = () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); b.classList.toggle("off", !state.types.has(t)); b.setAttribute("aria-pressed", state.types.has(t)); state.focus ? select(state.focus, false, state.ring) : update(); };
       chips.appendChild(b);
     });
