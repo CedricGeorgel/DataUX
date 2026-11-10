@@ -320,7 +320,7 @@ try {
       const t = Object.values(page.properties || {}).find(p => p.type === "title");
       if (!t || page.in_trash || page.archived) continue;
       // Fiche contributeur : tout ce qui présente la personne. Les fiches relues viennent des relations.
-      const person = { name: plain(t.title), job: "", bio: "", tags: [], since: "", photo: "", links: [] };
+      const person = { name: plain(t.title), job: "", formation: "", bio: "", tags: [], since: page.created_time || "", photo: "", links: [] };
       const props = Object.entries(page.properties || {});
       // Case « Profil public » (ou « Affichage », « Consentement ») décochée : on ne publie que le nom
       const consent = props.find(([n, pr]) => pr.type === "checkbox" && /public|affich|consent/i.test(n));
@@ -328,11 +328,11 @@ try {
       const texts = [];
       for (const [pname, pr] of open ? props : []) {
         if (pr.type === "rich_text" && plain(pr.rich_text)) {
-          if (!person.job && /job|m[ée]tier|poste|r[ôo]le|fonction/i.test(pname)) person.job = plain(pr.rich_text);
+          if (!person.job && /job|m[ée]tier|poste|fonction/i.test(pname)) person.job = plain(pr.rich_text);
+          else if (!person.formation && /formation|[ée]cole|[ée]tudes/i.test(pname)) person.formation = plain(pr.rich_text);
           else texts.push(richHtml(pr.rich_text));
         }
         if ((pr.type === "select" || pr.type === "multi_select" || pr.type === "status")) person.tags.push(...propText(pr).split(", ").filter(Boolean));
-        if (pr.type === "date" && pr.date && !person.since) person.since = pr.date.start;
         if (pr.type === "url" && pr.url) {
           const u = /^[a-z]+:/i.test(pr.url) ? pr.url : "https://" + pr.url.replace(/^\/+/, "");
           if (/^https:\/\/[^\s"'<>]+$/.test(u)) person.links.push({ label: pname.trim(), url: u });
@@ -343,7 +343,9 @@ try {
         }
       }
       if (open) {
-        // Photo : propriété Fichiers, sinon l'icône de la page si c'est une image
+        // Photo : l'image de couverture de la page, sinon une propriété Fichiers, sinon l'icône si c'est une image
+        const cv = page.cover && (page.cover.file || page.cover.external);
+        if (cv) person.photo = await saveImage({ id: "p" + pub(nid(page.id)), src: cv.url }) || person.photo;
         const ic = page.icon && (page.icon.file || page.icon.external);
         if (!person.photo && ic) person.photo = await saveImage({ id: "p" + pub(nid(page.id)), src: ic.url }) || "";
         // Description : textes des propriétés puis contenu de la page (sans images)

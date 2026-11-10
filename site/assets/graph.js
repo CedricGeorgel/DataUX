@@ -498,6 +498,7 @@ function init(G) {
     wBody.innerHTML = `<div class="phead">${photo}<div>
         <div class="pname">${esc(p.name)}</div>
         ${p.job ? `<div class="muted">${esc(p.job)}</div>` : ""}
+        ${p.formation ? `<div class="muted" style="font-size:12.5px">Formation : ${esc(p.formation)}</div>` : ""}
         ${(p.tags || []).length ? `<p class="ptags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>` : ""}
       </div></div>
       ${links ? `<div class="acts">${links}</div>` : ""}
