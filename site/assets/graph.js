@@ -78,30 +78,36 @@ function init(G) {
     }
     return { x0, x1, y0, y1, W: x1 - x0, H: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
   }
-  let chips = null, isoBtn = null;
+  let chips = null, isoBtn = null, fitBar = () => {};
   const isoCount = G.nodes.filter(n => n.deg === 0).length;
   if (FULL) {
     const filterBtn = $("filterBtn"), pop = $("filters");
-    const closePop = () => { pop.classList.remove("open"); filterBtn.setAttribute("aria-expanded", "false"); };
-    filterBtn.onclick = e => { e.stopPropagation(); const o = pop.classList.toggle("open"); filterBtn.setAttribute("aria-expanded", o); };
+    const bar = document.querySelector(".bar");
+    const closePop = () => { pop.classList.remove("open"); bar.classList.remove("popopen"); filterBtn.setAttribute("aria-expanded", "false"); };
+    filterBtn.onclick = e => { e.stopPropagation(); const o = pop.classList.toggle("open"); bar.classList.toggle("popopen", o); filterBtn.setAttribute("aria-expanded", o); };
+    // Filtres en ligne dans la barre quand ils tiennent sur une ligne, sinon dans le menu « Filtres »
+    fitBar = () => { closePop(); bar.classList.add("inline"); if (bar.offsetHeight > 48) bar.classList.remove("inline"); };
     document.addEventListener("click", e => { if (pop.classList.contains("open") && !pop.contains(e.target) && !filterBtn.contains(e.target)) closePop(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && pop.classList.contains("open")) { closePop(); filterBtn.focus(); } });
     const panelBtn = $("panelBtn");
     panelBtn.onclick = () => { const closed = document.body.classList.toggle("nopanel"); const l = closed ? "Afficher le panneau" : "Masquer le panneau";
-      panelBtn.setAttribute("aria-label", l); panelBtn.title = l; panelBtn.setAttribute("aria-expanded", !closed); if (!state.focus) fitNodes(visNodes, 1.2, 400); };
+      panelBtn.setAttribute("aria-label", l); panelBtn.title = l; panelBtn.setAttribute("aria-expanded", !closed); fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 400); };
     chips = $("chips");
     typeKeys.forEach(t => {
       const b = document.createElement("button"); b.className = "chip"; b.setAttribute("aria-pressed", "true");
-      b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span>${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span>`;
+      b.title = TYPES[t].label;
+      b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span><span class="full">${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span></span><span class="short">${esc(TYPES[t].label.split(" ")[0])}</span>`;
       b.onclick = () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); b.classList.toggle("off", !state.types.has(t)); b.setAttribute("aria-pressed", state.types.has(t)); state.focus ? select(state.focus, false, state.ring) : update(); };
       chips.appendChild(b);
     });
     isoBtn = $("isoBtn");
-    const isoLabel = () => { isoBtn.textContent = (state.showIso ? "Masquer" : "Afficher") + ` les ${isoCount} fiches isolées`; isoBtn.classList.toggle("on", state.showIso); isoBtn.setAttribute("aria-pressed", state.showIso); };
+    isoBtn.title = `${isoCount} fiches sans lien`;
+    const isoLabel = () => { isoBtn.classList.toggle("off", !state.showIso); isoBtn.setAttribute("aria-pressed", state.showIso); };
     isoLabel(); if (!isoCount) isoBtn.style.display = "none";
     isoBtn.onclick = () => { state.showIso = !state.showIso; isoLabel(); update(); };
     const sugBtn = $("sugBtn"); if (!G.conf.length) sugBtn.style.display = "none";
-    const sugLabel = () => { sugBtn.textContent = state.showSug ? "Masquer les confusions" : "Afficher les confusions"; sugBtn.classList.toggle("on", state.showSug); sugBtn.setAttribute("aria-pressed", state.showSug); };
+    sugBtn.title = "Liens « À ne pas confondre »";
+    const sugLabel = () => { sugBtn.classList.toggle("off", !state.showSug); sugBtn.setAttribute("aria-pressed", state.showSug); };
     sugLabel();
     sugBtn.onclick = () => { state.showSug = !state.showSug; sugLabel(); state.focus ? select(state.focus, false, state.ring) : update(); };
     const dl = $("names");
@@ -411,7 +417,9 @@ function init(G) {
   const wTitle = FULL && win.querySelector(".wt"), wSw = FULL && win.querySelector(".sw"), wBody = FULL && win.querySelector(".wbody");
   const wCol = FULL && win.querySelector("[data-collapse]");
   const ficheCache = new Map(); let ficheReq = null, shown = null;
-  function setCollapsed(c) { if (!FULL) return; win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); const l = c ? "Déplier la fiche" : "Replier la fiche"; wCol.setAttribute("aria-label", l); wCol.title = l; wCol.textContent = c ? "▸" : "▾"; }
+  function setCollapsed(c) { if (!FULL) return; win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); const l = c ? "Déplier la fiche" : "Replier la fiche"; wCol.setAttribute("aria-label", l); wCol.title = l; wCol.textContent = c ? "▸" : "▾";
+    // Une fiche dépliée ne doit pas dépasser du bas de l'écran
+    if (!c && innerWidth > 760) requestAnimationFrame(() => { const r = win.getBoundingClientRect(); if (r.bottom > innerHeight - 8) win.style.top = Math.max(8, innerHeight - 8 - r.height) + "px"; }); }
   function resetFiche() {
     shown = null; if (ficheReq) ficheReq.abort();
     win.classList.add("empty"); wTitle.textContent = "Fiche";
@@ -458,7 +466,12 @@ function init(G) {
   }
   if (FULL) {
     win.classList.add("empty");
-    win.querySelector(".whead").addEventListener("click", () => setCollapsed(!win.classList.contains("collapsed")));
+    // Un clic sur la barre de titre replie ou déplie. Après un glissement, on ne replie pas.
+    win.querySelector(".whead").addEventListener("click", () => { if (win.dataset.moved) { win.dataset.moved = ""; return; } setCollapsed(!win.classList.contains("collapsed")); });
+    // La fiche se déplace en tirant sa barre de titre. Sa place est gardée pour la prochaine visite.
+    const fp = store.get("reseau-fiche-pos");
+    if (fp && innerWidth > 760) { win.style.left = Math.min(Math.max(0, fp.x), innerWidth - 120) + "px"; win.style.top = Math.min(Math.max(0, fp.y), innerHeight - 44) + "px"; }
+    draggable(win, "reseau-fiche-pos");
     win.addEventListener("keydown", e => { if (e.key === "Escape" && !win.classList.contains("collapsed")) { e.stopPropagation(); setCollapsed(true); wCol.focus(); } });
     // Taille choisie en tirant le coin bas-droit : gardée pour la prochaine visite
     const size = store.get("reseau-fiche-size");
@@ -473,13 +486,15 @@ function init(G) {
     head.addEventListener("pointerdown", e => {
       if (e.target.closest("button") || innerWidth <= 760) return;
       e.preventDefault(); head.setPointerCapture(e.pointerId);
-      const r = el.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+      const r = el.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top, sx = e.clientX, sy = e.clientY;
+      el.dataset.moved = "";
       const move = ev => {
+        if (!el.dataset.moved) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return; el.dataset.moved = "1"; }
         const x = Math.min(Math.max(0, ev.clientX - ox), innerWidth - 120), y = Math.min(Math.max(0, ev.clientY - oy), innerHeight - 44);
         el.style.left = x + "px"; el.style.top = y + "px"; el.style.bottom = "auto"; el.style.right = "auto";
       };
       const up = () => { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up);
-        store.set(key, { x: parseFloat(el.style.left), y: parseFloat(el.style.top) }); };
+        if (el.dataset.moved) store.set(key, { x: parseFloat(el.style.left), y: parseFloat(el.style.top) }); };
       head.addEventListener("pointermove", move); head.addEventListener("pointerup", up);
     });
   }
@@ -504,10 +519,11 @@ function init(G) {
   }
 
   // ---------- Lancement
-  update(); renderPanel();
+  update(); renderPanel(); fitBar();
+  if (document.fonts) document.fonts.ready.then(() => fitBar());
   sim.stop(); for (let i = 0; i < 350; i++) sim.tick(); sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
-  addEventListener("resize", () => { if (!state.focus) fitNodes(visNodes, 1.2, 0); });
+  addEventListener("resize", () => { fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 0); });
   const deep = location.hash.slice(1).replace(/-/g, "").toLowerCase();
   if (deep && byId.has(deep)) select(deep, true);
 }

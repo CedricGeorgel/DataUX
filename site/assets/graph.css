@@ -6,6 +6,17 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1
 svg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 svg:active{cursor:grabbing}
 .bar{position:fixed;top:12px;left:12px;right:420px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;z-index:3}
+.bar.popopen{z-index:8}
+.chip .short{display:none}
+.chip .sw.conf{background:var(--conf);width:12px;height:2px;border-radius:1px}
+.bar.inline #filterBtn{display:none}
+.bar.inline .pop{display:flex;position:static;width:auto;padding:0;border:0;background:none;box-shadow:none;align-items:center;gap:6px}
+.bar.inline .pop h4{display:none}
+.bar.inline .pop .row{flex-wrap:nowrap;margin:0}
+.bar.inline .pop .row:last-child{padding-left:6px;border-left:1px solid var(--line)}
+.bar.inline .chip .full{display:none}
+.bar.inline .chip .short{display:inline}
+.bar.inline .chip{white-space:nowrap}
 .fwrap{position:relative}
 .pop{position:absolute;top:calc(100% + 6px);left:0;width:min(560px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);
  border-radius:10px;padding:12px 14px;display:none;box-shadow:0 6px 24px rgba(0,0,0,.18);z-index:5}
@@ -123,7 +134,7 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 /* Fiche : barre sous la recherche, dépliée au clic sur un point, redimensionnable */
 .fiche-win{left:12px;top:56px;width:420px;height:min(62vh,640px);min-width:280px;min-height:180px;max-height:calc(100vh - 68px);resize:both;z-index:6}
 .fiche-win.collapsed{min-height:0}
-.fiche-win .whead{cursor:pointer}
+.fiche-win .whead{cursor:grab}
 .fiche-win.collapsed .wt{color:var(--muted);font-weight:500}
 .fiche-win.empty .sw{display:none}
 
