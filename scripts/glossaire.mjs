@@ -34,6 +34,13 @@ const FORMES = {
   "Product Owner (PO)": ["Product Owner"],
   "Product Manager (PM)": ["Product Manager"],
 };
+// Termes à ne pas relier dans certaines bases ou fiches, quand le mot y a un autre sens
+// (« engagement » au sens d'engagement envers un choix, « échantillon » gratuit, « PageSpeed Insights »).
+const EXCLURE = {
+  "Engagement": { bases: ["biais", "loi", "acteur"] },
+  "Échantillon": { fiches: ["Principe de réciprocité"] },
+  "Insight": { fiches: ["Core Web Vitals"] },
+};
 const ZONES = new Set(["paragraph", "bulleted_list_item", "numbered_list_item", "quote", "callout", "toggle", "to_do"]);
 
 const WRITE = process.argv.includes("--write");
@@ -168,6 +175,7 @@ for (const base of BASES) {
       for (const t of termes) {
         // Une fiche dont le nom contient le terme l'emploie dans son sens à elle (« sprint » dans « Design sprint »)
         if (fait.has(t.id) || name.toLowerCase().includes(t.forme.toLowerCase())) continue;
+        const ex = EXCLURE[t.name]; if (ex && ((ex.bases || []).includes(base.key) || (ex.fiches || []).includes(name))) continue;
         for (let i = 0; i < rich.length; i++) {
           const r = rich[i];
           if (r.type !== "text" || r.text.link || r.annotations.code) continue;
