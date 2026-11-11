@@ -487,6 +487,38 @@ def m_book(r):
     return s
 
 
+def m_article(r):
+    # un article : une page à coin plié, titre, deux colonnes, un graphique, des notes de bas de page, d'autres pages derrière
+    s = []; w, h = 340, 450; x, y = CX - w / 2, CY - h / 2 - 5; c = 70
+    for k, o in ((2, .15), (1, .28)):
+        s.append(rect(x + 26 * k, y - 14 * k, w, h, 8, o))
+    s.append(path(f"M{x} {y + 8} Q {x} {y}, {x + 8} {y} L {x + w - c} {y} L {x + w} {y + c} L {x + w} {y + h - 8} Q {x + w} {y + h}, {x + w - 8} {y + h} L {x + 8} {y + h} Q {x} {y + h}, {x} {y + h - 8} Z", 1, acc=True))
+    s.append(path(f"M{x + w - c} {y} L {x + w - c} {y + c} L {x + w} {y + c}", .7, w=4))
+    s.append(line(x + 36, y + 56, x + 36 + (w - 150) * r.uniform(.7, 1), y + 56, 1, w=10))
+    s.append(line(x + 36, y + 84, x + 36 + 130, y + 84, .5, w=4))
+    s.append(line(x + 36, y + 110, x + w - 36, y + 110, .3, w=2))
+    col = (w - 96) / 2
+    for cx in (x + 36, x + 60 + col):
+        for k in range(r.choice([6, 7])):
+            ww = col * (1 if k < 5 else r.uniform(.4, .8))
+            s.append(line(cx, y + 138 + k * 24, cx + ww, y + 138 + k * 24, .4, w=4))
+    # petit graphique
+    gx, gy = x + 36, y + h - 130
+    s.append(line(gx, gy, gx, gy + 70, .6, w=3)); s.append(line(gx, gy + 70, gx + 110, gy + 70, .6, w=3))
+    hi = r.randrange(5)
+    for k in range(5):
+        bh = r.uniform(20, 62) if k != hi else 66
+        s.append(rect(gx + 14 + k * 20, gy + 70 - bh, 12, bh, 2, 1 if k == hi else .45, acc=k == hi, fill=True))
+    s.append(f'<text x="{x + w - 70}" y="{y + h - 40}" font-family="Inter Display" font-weight="300" font-size="34" fill="ACC" stroke="none" opacity=".9">[1]</text>')
+    # références qui renvoient vers d'autres articles
+    for side in (-1, 1):
+        for k in range(r.randint(2, 3)):
+            bx = CX + side * (300 + k * 70); by = CY - 120 + k * 100 + r.uniform(-20, 20)
+            s.append(rect(bx - 22, by - 30, 44, 60, 4, .25))
+            s.append(line(bx - 12, by - 12, bx + 12, by - 12, .25, w=3)); s.append(line(bx - 12, by + 2, bx + 8, by + 2, .25, w=3))
+    return s
+
+
 def m_monogram(r, nom):
     parts = [p for p in re.split(r"[\s\-.()]+", nom) if p and p[0].isalpha() and p.lower() not in ("et", "de", "la", "avec", "l")]
     ini = "".join(p[0].upper() for p in parts[:2]) or nom[:1]
@@ -550,6 +582,7 @@ MANUEL = {
     "Biais rétrospectif": "journey", "Effet Barnum": "person", "Écart d'information": "progress",
     "Illusion de profondeur explicative": "layers", "Effet de réflexion": "balance", "Heuristique d'affect": "balance",
     "Biais d'automatisation": "loop", "Biais de congruence à l'humeur": "mirror",
+    "The Magical Number Seven, Plus or Minus Two": "article",
 }
 
 
