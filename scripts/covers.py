@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Covers des fiches DataUX.
 
+Page web équivalente : site/covers/ (covers.js reprend les mêmes motifs et le même hasard).
 Usage : python3 scripts/covers.py fiches.json site/covers
   fiches.json : [{"id": "<page notion>", "base": "biais", "nom": "Effet d'ancrage"}, ...]
 Sortie : un PNG 1500 x 600 par fiche, nommé d'après son titre, et covers.json (id -> fichier).
