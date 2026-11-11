@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   const $ = id => document.getElementById(id);
-  const BASES = { kpi: "Fiches KPI", loi: "Lois du design", biais: "Biais cognitifs", methode: "Méthodes UX", framework: "Frameworks produit", acteur: "Acteurs du design", glossaire: "Glossaire design", biblio: "Bibliographie design" };
+  const BASES = { kpi: "Fiches KPI", loi: "Lois du design", biais: "Biais cognitifs", methode: "Méthodes UX", framework: "Frameworks produit", acteur: "Acteurs du design", glossaire: "Glossaire design", biblio: "Bibliographie design", ressource: "Ressources" };
   const MOTIFS = { target: "Cible", scale: "Échelle", funnel: "Entonnoir", diamonds: "Double diamant", person: "Personne", clusters: "Groupes", outlier: "Élément qui se distingue", tree: "Arbre de choix", gauge: "Jauge", curve: "Courbe", bars: "Barres", clock: "Horloge", loop: "Boucle", canvas: "Grille", matrix: "Matrice", crowd: "Foule", balance: "Balance", mirror: "Miroir", memory: "Mémoire", stack: "Briques", star: "Étoile", noise: "Bruit", progress: "Progression", spotlight: "Projecteur", tag: "Étiquette de prix", journey: "Parcours", bubbles: "Bulles", layers: "Couches", network: "Réseau", book: "Livre", article: "Article", monogram: "Initiales" };
   const base = $("base"), motif = $("motif"), nom = $("nom"), img = $("img"), dl = $("dl"), msg = $("msg"), auto = $("auto");
   Object.entries(BASES).forEach(([k, v]) => base.add(new Option(v, k)));

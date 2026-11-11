@@ -17,7 +17,7 @@ CX, CY = W / 2, H / 2
 
 BASES = {
     "kpi": "#d9730d", "loi": "#337ea9", "biais": "#9065b0", "methode": "#448361",
-    "framework": "#cb912f", "acteur": "#c14c8a", "glossaire": "#d44c47", "biblio": "#91918e",
+    "framework": "#cb912f", "acteur": "#c14c8a", "glossaire": "#d44c47", "biblio": "#91918e", "ressource": "#9f6b53",
 }
 
 
@@ -566,7 +566,7 @@ REGLES = [
 ]
 
 DEFAUT = {"kpi": "curve", "loi": "target", "biais": "noise", "methode": "journey", "framework": "canvas",
-          "acteur": "monogram", "glossaire": "stack", "biblio": "book"}
+          "acteur": "monogram", "glossaire": "stack", "biblio": "book", "ressource": "canvas"}
 
 
 def norm(s):
@@ -575,6 +575,7 @@ def norm(s):
 
 # Cas où les mots-clés tombent à côté (« ice » dans « matrice », « mode » dans « modèle »…).
 MANUEL = {
+    "Template de service blueprint": "canvas", "Template de matrice valeur effort": "matrix", "Grille de scoring RICE": "matrix",
     "Modèle mental": "mirror", "Mémoire de travail": "memory", "Heuristique de représentativité": "noise",
     "Prophétie autoréalisatrice": "loop", "Service blueprint": "canvas", "Matrice valeur effort": "matrix",
     "Loi de Parkinson": "clock", "Satisficing": "progress", "Cascade d'information": "crowd",
