@@ -575,6 +575,11 @@ def norm(s):
 
 # Cas où les mots-clés tombent à côté (« ice » dans « matrice », « mode » dans « modèle »…).
 MANUEL = {
+    "Matrice Impact/effort": "matrix",
+    "Heuristique de Nielsen": "matrix",
+    "Heuristique de Bastien et Scapin": "matrix",
+    "Grille d’observation": "spotlight",
+    "Journal de bord": "clock",
     "Template de service blueprint": "canvas", "Template de matrice valeur effort": "matrix", "Grille de scoring RICE": "matrix",
     "Modèle mental": "mirror", "Mémoire de travail": "memory", "Heuristique de représentativité": "noise",
     "Prophétie autoréalisatrice": "loop", "Service blueprint": "canvas", "Matrice valeur effort": "matrix",
@@ -614,7 +619,7 @@ def main(src, out):
     os.makedirs(out, exist_ok=True)
     index, seen = {}, set()
     for f in fiches:
-        name = slug(f["nom"]) or f["id"][:8]
+        name = slug(f.get("fichier") or f["nom"]) or f["id"][:8]
         while name in seen:
             name += "-2"
         seen.add(name)
