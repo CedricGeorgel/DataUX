@@ -5,9 +5,16 @@
   const MOTIFS = { target: "Cible", scale: "Échelle", funnel: "Entonnoir", diamonds: "Double diamant", person: "Personne", clusters: "Groupes", outlier: "Élément qui se distingue", tree: "Arbre de choix", gauge: "Jauge", curve: "Courbe", bars: "Barres", clock: "Horloge", loop: "Boucle", canvas: "Grille", matrix: "Matrice", crowd: "Foule", balance: "Balance", mirror: "Miroir", memory: "Mémoire", stack: "Briques", star: "Étoile", noise: "Bruit", progress: "Progression", spotlight: "Projecteur", tag: "Étiquette de prix", journey: "Parcours", bubbles: "Bulles", layers: "Couches", network: "Réseau", book: "Livre", article: "Article", monogram: "Initiales" };
   const base = $("base"), motif = $("motif"), nom = $("nom"), img = $("img"), dl = $("dl"), msg = $("msg"), auto = $("auto");
   Object.entries(BASES).forEach(([k, v]) => base.add(new Option(v, k)));
-  motif.add(new Option("Automatique (d'après le titre)", ""));
-  Covers.MOTIFS.slice().sort((a, b) => (MOTIFS[a] || a).localeCompare(MOTIFS[b] || b, "fr")).forEach(m => motif.add(new Option(MOTIFS[m] || m, m)));
-  base.value = "biblio";
+  // Trois motifs sont réservés à leur base ; les autres sont communs à toutes
+  const ONLY = { book: "biblio", article: "biblio", monogram: "acteur" };
+  const sorted = Covers.MOTIFS.slice().sort((a, b) => (MOTIFS[a] || a).localeCompare(MOTIFS[b] || b, "fr"));
+  function fillMotifs() {
+    const keep = motif.value;
+    motif.length = 0; motif.add(new Option("Automatique (d'après le titre)", ""));
+    sorted.filter(m => !ONLY[m] || ONLY[m] === base.value).forEach(m => motif.add(new Option(MOTIFS[m] || m, m)));
+    motif.value = [...motif.options].some(o => o.value === keep) ? keep : "";
+  }
+  base.value = "biblio"; fillMotifs();
 
   let svg = "", token = 0;
   async function render() {
@@ -19,6 +26,7 @@
     auto.textContent = motif.value ? "" : "Motif choisi : " + (MOTIFS[r.motif] || r.motif) + ".";
     msg.textContent = "";
   }
+  base.addEventListener("input", fillMotifs);
   [nom, base, motif].forEach(el => el.addEventListener("input", render));
 
   dl.addEventListener("click", () => {
