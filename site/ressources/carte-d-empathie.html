@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte d'empathie · DataUX</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<style>
+@font-face{font-family:'Cactus Classical Serif';src:url(fonts/cactus-classical-serif-latin.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@page{size:A4 landscape;margin:0}
+html{background:#e9e5e1;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;font-family:var(--font-serif,'Cactus Classical Serif',Georgia,serif);color:var(--ink,#141414)}
+a{color:var(--accent,#9f6b53)}a:hover{color:#6e4a38}
+.root{width:1123px;height:794px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;background:var(--paper,#fff);overflow:hidden;padding:30px 44px 20px}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:32px;flex:none}
+h1{font-family:var(--font-display,Laze,'Cactus Classical Serif',serif);font-size:40px;line-height:1.05;margin:0;font-weight:400;letter-spacing:.01em;max-width:700px}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:9px;width:260px;flex:none}
+.fld span{display:flex;gap:8px;align-items:baseline}
+.fld b{font-weight:400;min-width:74px;text-align:right;text-transform:uppercase;letter-spacing:.08em}
+.fld i{flex:1;border-bottom:1px solid var(--ink,#141414);height:11px}
+.main{flex:1;display:flex;flex-direction:column;gap:10px;min-height:0}
+.row{display:flex;gap:10px;min-height:0}
+.col{display:flex;flex-direction:column;gap:10px;min-height:0}
+.fill{flex:1}
+.z{border:1px solid var(--line,#c9c2bb);border-radius:3px;position:relative;min-height:0;padding:30px 10px 8px;box-sizing:border-box;background:var(--paper,#fff);display:flex;flex-direction:column;gap:6px}
+.z h2{position:absolute;top:-1px;left:-1px;margin:0;font-family:Laze,'Cactus Classical Serif',serif;font-size:13px;font-weight:400;background:var(--ink,#141414);color:var(--paper,#fff);padding:5px 10px;border-radius:3px 0 3px 0;letter-spacing:.02em;white-space:nowrap}
+.z h2 s{text-decoration:none;color:var(--accent-soft,#c9a898);margin-right:7px}
+.z.soft{border-style:dashed}
+.z.dark{background:var(--surface,#f7f4f1)}
+.lo{flex:1;min-height:20px}
+.z p{margin:0;font-size:10px;color:var(--text-muted,#666);line-height:1.35}
+.tw{border:1px solid var(--line,#c9c2bb);border-radius:3px;overflow:hidden;flex:1;min-height:0;display:flex}
+table{border-collapse:collapse;width:100%;height:100%;font-size:10.5px;table-layout:fixed}
+th{text-align:left;padding:6px 8px;font-weight:400;font-size:9px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--line,#c9c2bb);color:var(--ink,#141414);vertical-align:bottom;height:14px}
+td{border-bottom:1px solid var(--line,#c9c2bb);padding:5px 8px;vertical-align:top;color:var(--text-muted,#777)}
+tr:last-child td{border-bottom:0}
+td.n{color:var(--ink,#141414);background:var(--surface,#f7f4f1)}
+th+th,td+td,td[rowspan]+td{border-left:1px solid var(--line,#c9c2bb)}
+.compact td{padding:3px 6px}
+.card{border:1px solid var(--line,#c9c2bb);border-radius:3px;padding:7px 9px;font-size:10px;color:var(--text-muted,#777);min-height:32px;box-sizing:border-box;background:var(--paper,#fff)}
+.card.d{border-style:dashed}
+.pill{display:inline-block;font-size:9.5px;border:1px solid var(--line,#c9c2bb);border-radius:12px;padding:1px 8px;margin-right:4px;color:var(--ink,#141414)}
+.cb{display:flex;align-items:center;gap:7px;font-size:11px}
+.cb i{width:11px;height:11px;border:1px solid var(--line-strong,#8f867e);border-radius:2px;display:inline-block;flex:none}
+.leg{font-size:9.5px;color:var(--text-muted,#555);display:flex;gap:14px;align-items:center;flex-wrap:wrap;flex:none}
+.ft{display:flex;justify-content:space-between;align-items:baseline;font-size:8px;color:var(--ink,#141414);flex:none}
+.ft .d{text-transform:uppercase;letter-spacing:.08em;display:flex;gap:6px;align-items:baseline}
+.ft .d i{display:inline-block;border-bottom:1px solid var(--ink,#141414);height:8px}
+
+.root{margin:24px auto;outline:1px solid #c9c2bb}
+@media print{html{background:none}.root{margin:0;outline:0}}
+</style>
+</head>
+<body>
+<div class="root" style="width: 1123px; height: 794px">
+<div class="hd"><h1>Carte d'empathie</h1><div class="fld"><span><b>Projet</b><i></i></span><span><b>Équipe</b><i></i></span><span><b>Source</b><i></i></span></div></div>
+<div class="main">
+<div class="z " style="height:58px;padding-top:26px;flex:none"><h2><s>1</s>Qui</h2><div class="lo" style="height:22px;flex:none"></div></div><div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(1, minmax(0, 1fr)); gap: 10px; min-height: 0; height: 108px"><div class="z " style=""><h2><s>2</s>Ce qu'il dit</h2><div class="lo"></div></div><div class="z " style=""><h2><s>3</s>Ce qu'il pense</h2><div class="lo"></div></div></div><div style="flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(1, minmax(0, 1fr)); gap: 10px; min-height: 0"><div class="z " style=""><h2><s>4</s>Ce qu'il fait</h2><div class="lo"></div></div><div class="z " style=""><h2></h2><h2><span style="color: var(--accent-soft,#c9a898); margin-right: 7px">5</span>Ce qu'il voit&nbsp;</h2><div class="lo"></div></div><div class="z " style=""><h2></h2><h2><span style="color: var(--accent-soft,#c9a898); margin-right: 7px">6</span>Ce qu'il entend</h2><div class="lo"></div></div></div><div class="row" style="height:118px"><div class="z " style="flex:1"><h2><s>7</s>Douleurs</h2><div class="lo"></div></div><div class="z " style="flex:1"><h2><s>8</s>Gains</h2><div class="lo"></div></div></div>
+</div>
+<div class="ft"><span class="d">Date <i style="width:16px"></i><i style="width:16px"></i><i style="width:30px"></i></span><span>cedricgeorgel.github.io/DataUX</span></div>
+</div>
+</body>
+</html>
