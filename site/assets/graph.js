@@ -639,7 +639,7 @@ function init(G) {
   // ---------- Bouton Ressources : ouvre directement la liste dans le panneau (page complète)
   if (FULL && RES.length) {
     const rbtn = $("resBtn");
-    rbtn.hidden = false; $("resCount").textContent = RES.length;
+    rbtn.hidden = false;
     rbtn.onclick = () => {
       if (state.focus) select(null);
       state.panel = "res";
