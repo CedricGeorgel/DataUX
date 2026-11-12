@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Story mapping · DataUX</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <style>
 @font-face{font-family:'Cactus Classical Serif';src:url(fonts/cactus-classical-serif-latin.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
@@ -51,6 +51,9 @@ th+th,td+td,td[rowspan]+td{border-left:1px solid var(--line,#c9c2bb)}
 .root{margin:24px auto;outline:1px solid #c9c2bb}
 @media print{html{background:none}.root{margin:0;outline:0}}
 </style>
+<link rel="stylesheet" href="edit.css">
+<script src="vendor/html-to-image.js" defer></script>
+<script src="edit.js" defer></script>
 </head>
 <body>
 <div class="root" style="width: 1123px; height: 794px">
