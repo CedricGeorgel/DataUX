@@ -515,6 +515,13 @@ function init(G) {
     wBody.querySelectorAll("[data-res]").forEach(b => b.onclick = () => showRes(b.dataset.res));
   }
   // Fiche d'une ressource : même fenêtre qu'une fiche, avec le lien vers le template et les fiches liées
+  // Ressources à plusieurs planches : libellés des boutons et liens supplémentaires
+  const RES_EXTRA = {
+    "Guide d'entretien utilisateur": {
+      dl: ["Télécharger le guide", "Télécharger la grille de prise de notes"],
+      open: [["Ouvrir la grille de prise de notes", "ressources/grille-de-prise-de-notes.html"]]
+    }
+  };
   async function showRes(rid) {
     const r = resById.get(rid); if (!r || !FULL) return;
     if (ficheReq) ficheReq.abort();
@@ -528,9 +535,11 @@ function init(G) {
       // « Télécharger » : la première image de la page Notion de la ressource (copiée dans le site par le build)
       const imgs = j ? [...j.html.matchAll(/<img src="(data\/img\/[\w.-]+)"/g)].map(m => m[1]) : [];
       const slug = r.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-      const dl = imgs.map((img, k) => `<a class="btn" href="${esc(img)}" download="${esc(slug + (imgs.length > 1 ? "-" + (k + 1) : "") + img.slice(img.lastIndexOf(".")))}">Télécharger${imgs.length > 1 ? " " + (k + 1) : ""}</a>`).join("");
+      const X = RES_EXTRA[r.name] || {};
+      const dl = imgs.map((img, k) => `<a class="btn" href="${esc(img)}" download="${esc(slug + (imgs.length > 1 ? "-" + (k + 1) : "") + img.slice(img.lastIndexOf(".")))}">${esc((X.dl || [])[k] || "Télécharger" + (imgs.length > 1 ? " " + (k + 1) : ""))}</a>`).join("");
+      const more = (X.open || []).map(([label, href]) => `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`).join("");
       const F = G.forms || {};
-      wBody.innerHTML = props + `<div class="acts" style="margin:0 0 12px"><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir le template ↗</a>${dl}</div>` + body
+      wBody.innerHTML = props + `<div class="acts" style="margin:0 0 12px"><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir le template ↗</a>${more}${dl}</div>` + body
         + (ls.length ? `<div class="contrib"><h4>Fiches liées</h4><ul class="links">${ls.map(n => item(n)).join("")}</ul></div>` : "")
         + (F.erreur ? `<div class="acts"><a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: r.name, lien: r.url }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a></div>` : "");
       wBody.scrollTop = 0;
