@@ -3,7 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES, CONTRIB_PROPERTY, CONTRIBUTEURS, FORMULAIRES } from "./config.js";
+import { NOTION_API, NOTION_VERSION, BASES, CONFUSION, IGNORE, NOMS_GROUPES, CONTRIB_PROPERTY, CONTRIBUTEURS, FORMULAIRES, RESSOURCES } from "./config.js";
 
 const OUT = path.resolve(process.argv[2] || "site/data");
 const TOKEN = process.env.NOTION_TOKEN;
@@ -384,6 +384,31 @@ const graph = {
   // Seuls des liens https sont acceptés pour les formulaires
   forms: Object.fromEntries(Object.entries(FORMULAIRES).filter(([, u]) => /^https:\/\/[^\s"'<>]+$/.test(u || ""))),
 };
+// Ressources validées (lien rempli) : liste à part, reliée aux fiches par leurs relations
+const ressources = [];
+try {
+  const src = await sourceId(RESSOURCES);
+  let cursor = null;
+  do {
+    const body = { page_size: 100 }; if (cursor) body.start_cursor = cursor;
+    const r = await notion("POST", `/data_sources/${src}/query`, body);
+    for (const page of r.results || []) {
+      if (page.in_trash || page.archived) continue;
+      let name = "", kind = "", url = "", liees = [];
+      for (const [pname, p] of Object.entries(page.properties || {})) {
+        if (p.type === "title") name = plain(p.title);
+        if (pname === RESSOURCES.type) kind = propText(p);
+        if (pname === RESSOURCES.lien && p.type === "url") url = p.url || "";
+        if (p.type === "relation") liees.push(...(await relationIds(page.id, p)).filter(t => nodes.has(t)));
+      }
+      if (!name || !/^https:\/\/[^\s"'<>]+$/.test(url)) continue;
+      ressources.push({ id: nid(page.id), page, name, kind, url, liees: [...new Set(liees)] });
+    }
+    cursor = r.has_more ? r.next_cursor : null;
+  } while (cursor);
+  console.log(`Ressources : ${ressources.length} publiées`);
+} catch (e) { console.warn("Ressources illisibles :", e.message); }
+
 // Publication : identifiants Notion remplacés par les identifiants publics
 const pubGraph = {
   ...graph,
@@ -395,6 +420,8 @@ const pubGraph = {
   people: [...people].map(([cid, p]) => ({ id: pub(cid), ...p,
     fiches: [...contrib].filter(([fid, cs]) => nodes.has(fid) && cs.includes(cid)).map(([fid]) => pub(fid)) }))
     .filter(p => p.fiches.length).sort((a, b) => b.fiches.length - a.fiches.length || a.name.localeCompare(b.name, "fr")),
+  ressources: ressources.map(r => ({ id: pub(r.id), name: r.name, kind: r.kind, url: r.url, liees: r.liees.map(pub) }))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr")),
 };
 await fs.writeFile(path.join(OUT, "graph.json"), JSON.stringify(pubGraph));
 console.log(`Graphe : ${list.length} fiches, ${E.length} liens, ${graph.conf.length} confusions, ${comms.length} groupes`);
@@ -415,5 +442,17 @@ for (const [id, page] of pages) {
   }
   catch (e) { failed++; console.warn("Fiche non générée :", nodes.get(id).name, e.message); }
   if (++n % 50 === 0) console.log(`${n}/${pages.size} fiches`);
+}
+// Fiches des ressources : même format que les autres, sans la propriété du lien (affiché en bouton)
+for (const r of ressources) {
+  try {
+    const f = await fiche(r.id, r.page, []);
+    f.id = pub(r.id);
+    const relink = h => h.replace(/<button class="lnk" data-id="([0-9a-f]{32})">([\s\S]*?)<\/button>/g,
+      (m, pid, inner) => nodes.has(pid) ? `<button class="lnk" data-id="${pub(pid)}">${inner}</button>` : inner);
+    f.html = relink(f.html);
+    f.props = f.props.filter(p => p.name !== RESSOURCES.lien).map(p => ({ ...p, html: relink(p.html) }));
+    await fs.writeFile(path.join(OUT, "fiches", f.id + ".json"), JSON.stringify(f));
+  } catch (e) { failed++; console.warn("Ressource non générée :", r.name, e.message); }
 }
 console.log(`Terminé en ${Math.round((Date.now() - t0) / 1000)} s, ${calls} appels à Notion, ${failed} fiche(s) en échec.`);

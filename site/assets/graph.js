@@ -11,6 +11,10 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+// Thème choisi dans le panneau (clair ou sombre). Sans choix, le site suit le réglage de l'appareil.
+const savedTheme = store.get("reseau-theme");
+if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 
 // ---------------------------------------------------------------- Écrans de chargement, d'erreur et de premier lancement
 const screen = document.createElement("div"); screen.className = "screen"; document.body.appendChild(screen);
@@ -76,8 +80,10 @@ function init(G) {
   }
   // Glossaire et bibliographie masqués au départ : ce sont des fiches de référence, pas des notions à explorer
   const HIDDEN = ["glossaire", "biblio"];
-  const state = { ring: false, types: new Set(typeKeys.filter(t => !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null };
+  const state = { ring: false, types: new Set(typeKeys.filter(t => !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null, panel: null };
   const color = n => TYPES[n.type].color;
+  // Ressources (templates à imprimer) : hors carte, ouvertes depuis l'encart « Ressources »
+  const RES = G.ressources || [], resById = new Map(RES.map(r => [r.id, r]));
 
   // ---------- Barre de filtres (page complète)
   // Mobile : le panneau et la fiche deviennent des feuilles en bas d'écran
@@ -361,7 +367,7 @@ function init(G) {
   // 1 clic : on montre les liens sans toucher à la disposition. Double clic : la fiche est isolée en couronne.
   function select(id, center, ring = false) {
     const wasRing = state.ring;
-    state.focus = id; state.ring = !!(id && ring);
+    state.focus = id; state.ring = !!(id && ring); if (id) state.panel = null;
     releaseRing();
     if (id) { const n = byId.get(id);
       if (!state.types.has(n.type)) { state.types.add(n.type); if (chips) [...chips.children][typeKeys.indexOf(n.type)].classList.remove("off"); }
@@ -403,9 +409,19 @@ function init(G) {
   const item = (n, extra = "") => `<li><span class="sw" style="background:${color(n)}"></span><button class="lnk" data-id="${n.id}">${esc(n.name)}</button>${extra}</li>`;
   const grab = () => { const o = !document.body.classList.contains("nopanel");
     return `<button class="grab" aria-expanded="${o}" aria-label="${o ? "Réduire le panneau" : "Agrandir le panneau"}"><span></span></button>`; };
+  const themeSwitch = () => { const d = isDark();
+    return `<button class="theme" role="switch" aria-checked="${d}" data-theme-switch><span class="trk" aria-hidden="true"></span>Mode sombre</button>`; };
   function renderPanel() {
     if (!panel) return;
-    if (state.focus) { const n = byId.get(state.focus);
+    if (!state.focus && state.panel === "res") {
+      const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || a.localeCompare(b, "fr"));
+      panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
+        <h1 style="margin-top:12px">Ressources</h1>
+        <p class="muted">Templates à imprimer, à remplir à la main ou à redessiner.</p>
+        ${kinds.map(k => { const rs = RES.filter(r => (r.kind || "Autres") === k);
+          return `<h3>${esc(k)} · ${rs.length}</h3><ul class="links">${rs.map(r => `<li><span class="sw res"></span><button class="lnk" data-res="${esc(r.id)}">${esc(r.name)}</button></li>`).join("")}</ul>`; }).join("")}
+        <div class="pfoot">${themeSwitch()}</div>`;
+    } else if (state.focus) { const n = byId.get(state.focus);
       const groups = {}; [...n.nb].map(i => byId.get(i)).forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
       let h = `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
         <h1 style="margin-top:12px">${esc(n.name)}</h1>
@@ -414,7 +430,7 @@ function init(G) {
       if (!n.deg) h += `<p class="muted">Aucune relation logique. Cette fiche n'est reliée à rien.</p>`;
       typeKeys.forEach(t => { if (groups[t]) h += `<h3>${esc(TYPES[t].label)} · ${groups[t].length}</h3><ul class="links">${groups[t].sort((a, b) => b.deg - a.deg).map(m => item(m)).join("")}</ul>`; });
       if (n.sug.size) h += `<h2 style="color:var(--conf)">À ne pas confondre avec</h2><p class="muted" style="margin-top:-4px">Notions proches en apparence mais différentes. Trait rouge dans le graphe.</p><ul class="links">${[...n.sug].map(i => item(byId.get(i))).join("")}</ul>`;
-      panel.innerHTML = grab() + h;
+      panel.innerHTML = grab() + h + `<div class="pfoot">${themeSwitch()}</div>`;
     } else {
       const hubs = G.nodes.slice().sort((a, b) => b.deg - a.deg).slice(0, 8);
       const iso = G.nodes.filter(n => n.deg === 0);
@@ -427,12 +443,18 @@ function init(G) {
         <div class="pfoot">
           ${G.forms && G.forms.proposition ? `<a class="btn" href="${esc(formUrl(G.forms.proposition, {}))}" target="_blank" rel="noopener noreferrer">Proposer une fiche ou une base</a>` : ""}
           <p class="legend">Dernière mise à jour ${esc(when)}</p>
+          ${themeSwitch()}
         </div>`;
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
     panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
-    const bk = panel.querySelector("[data-back]"); if (bk) bk.onclick = () => select(null);
+    panel.querySelectorAll("[data-res]").forEach(b => b.onclick = () => showRes(b.dataset.res));
+    const bk = panel.querySelector("[data-back]"); if (bk) bk.onclick = () => { if (state.panel && !state.focus) { state.panel = null; renderPanel(); } else select(null); };
     const gb = panel.querySelector(".grab"); if (gb) gb.onclick = () => $("panelBtn").click();
+    const ts = panel.querySelector("[data-theme-switch]");
+    if (ts) ts.onclick = () => { const t = isDark() ? "light" : "dark";
+      document.documentElement.dataset.theme = t; store.set("reseau-theme", t);
+      ts.setAttribute("aria-checked", t === "dark"); };
   }
 
   // ---------- Fiche : barre repliée sous la recherche. Un clic sur un point la déplie avec le contenu de la fiche.
@@ -482,13 +504,42 @@ function init(G) {
       F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
       F.proposition ? `<a class="btn" href="${esc(formUrl(F.proposition, { liee: n.name }))}" target="_blank" rel="noopener noreferrer">Proposer une fiche liée</a>` : "",
     ].join("");
-    wBody.innerHTML = props + body + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p>${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
+    const rs = RES.filter(r => r.liees.includes(n.id));
+    const resH = rs.length ? `<div class="contrib"><h4>Ressources</h4><ul class="links">${rs.map(r => `<li><span class="sw res"></span><button class="lnk" data-res="${esc(r.id)}">${esc(r.name)}</button></li>`).join("")}</ul></div>` : "";
+    wBody.innerHTML = props + body + resH + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p>${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
     wBody.scrollTop = 0;
     wBody.querySelectorAll("[data-id]").forEach(b => {
       if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true);
       else b.replaceWith(...b.childNodes);
     });
     wBody.querySelectorAll("[data-person]").forEach(b => b.onclick = () => showPerson(b.dataset.person));
+    wBody.querySelectorAll("[data-res]").forEach(b => b.onclick = () => showRes(b.dataset.res));
+  }
+  // Fiche d'une ressource : même fenêtre qu'une fiche, avec le lien vers le template et les fiches liées
+  async function showRes(rid) {
+    const r = resById.get(rid); if (!r || !FULL) return;
+    if (ficheReq) ficheReq.abort();
+    shown = "res:" + rid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
+    wTitle.textContent = r.name; wSw.style.background = "var(--accent)";
+    const render = j => {
+      wBody.removeAttribute("aria-busy");
+      const props = j && j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
+      const body = j && j.html.trim() ? j.html : `<p class="muted">Pas encore de mode d'emploi pour cette ressource.</p>`;
+      const ls = r.liees.map(i => byId.get(i)).filter(Boolean);
+      const F = G.forms || {};
+      wBody.innerHTML = props + `<div class="acts" style="margin:0 0 12px"><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir le template ↗</a></div>` + body
+        + (ls.length ? `<div class="contrib"><h4>Fiches liées</h4><ul class="links">${ls.map(n => item(n)).join("")}</ul></div>` : "")
+        + (F.erreur ? `<div class="acts"><a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: r.name, lien: r.url }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a></div>` : "");
+      wBody.scrollTop = 0;
+      wBody.querySelectorAll("[data-id]").forEach(b => { if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true); else b.replaceWith(...b.childNodes); });
+    };
+    if (ficheCache.has(rid)) return render(ficheCache.get(rid));
+    wBody.innerHTML = `<div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:85%"></div>`;
+    wBody.setAttribute("aria-busy", "true");
+    ficheReq = new AbortController();
+    try { const res = await fetch(API_FICHE(rid), { signal: ficheReq.signal }); const j = res.ok ? await res.json() : null;
+      if (j) ficheCache.set(rid, j); if (shown === "res:" + rid) render(j); }
+    catch (e) { if (e.name !== "AbortError" && shown === "res:" + rid) render(null); }
   }
   // Fiche d'un contributeur : métier, liens et fiches relues (cliquables)
   const peopleById = new Map((G.people || []).map(p => [p.id, p]));
@@ -526,7 +577,7 @@ function init(G) {
     const fp = store.get("reseau-fiche-pos");
     if (fp && innerWidth > 760) { win.style.left = Math.min(Math.max(0, fp.x), innerWidth - 120) + "px"; win.style.top = Math.min(Math.max(0, fp.y), innerHeight - 44) + "px"; }
     draggable(win, "reseau-fiche-pos");
-    win.querySelector("[data-close]").onclick = e => { e.stopPropagation(); if (shown && shown.startsWith("person:") && state.focus) { shown = null; loadFiche(state.focus); } else select(null); };
+    win.querySelector("[data-close]").onclick = e => { e.stopPropagation(); if (shown && /^(person|res):/.test(shown) && state.focus) { shown = null; loadFiche(state.focus); } else select(null); };
     swipe(win.querySelector(".whead"), d => { if (MOB()) setCollapsed(d > 0); });
     swipe($("panel"), d => { if (MOB() && (d > 0) !== document.body.classList.contains("nopanel")) $("panelBtn").click(); }, ".grab");
     win.addEventListener("keydown", e => { if (e.key === "Escape" && !win.classList.contains("collapsed")) { e.stopPropagation(); setCollapsed(true); wCol.focus(); } });
@@ -580,6 +631,26 @@ function init(G) {
     const p = store.get("reseau-legend-pos");
     if (p && innerWidth > 760) { lw.style.left = Math.min(Math.max(0, p.x), innerWidth - 120) + "px"; lw.style.top = Math.min(Math.max(0, p.y), innerHeight - 44) + "px"; lw.style.bottom = "auto"; lw.style.right = "auto"; }
     draggable(lw, "reseau-legend-pos");
+  }
+
+  // ---------- Encart Ressources : ouvre la liste dans le panneau (page complète)
+  if (FULL && RES.length) {
+    const rw = $("resWin"), rb = rw.querySelector(".wbody"), rc = rw.querySelector("[data-collapse]");
+    rw.hidden = false;
+    rb.innerHTML = `<p>${RES.length} template${RES.length > 1 ? "s" : ""} à imprimer : grilles, canvas, guides.</p><button class="btn" data-res-open>Voir la liste</button>`;
+    rb.querySelector("[data-res-open]").onclick = () => {
+      if (state.focus) select(null);
+      state.panel = "res";
+      if (document.body.classList.contains("nopanel")) $("panelBtn").click(); else renderPanel();
+    };
+    const setR = c => { rw.classList.toggle("collapsed", c); rc.setAttribute("aria-expanded", !c); rc.setAttribute("aria-label", c ? "Déplier les ressources" : "Replier les ressources"); rc.textContent = c ? "▸" : "▾"; store.set("reseau-res-collapsed", c); };
+    rc.onclick = () => setR(!rw.classList.contains("collapsed"));
+    rw.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setR(!rw.classList.contains("collapsed")); });
+    const savedR = store.get("reseau-res-collapsed");
+    setR(savedR === null ? innerWidth <= 760 : savedR);
+    const rp = store.get("reseau-res-pos");
+    if (rp && innerWidth > 760) { rw.style.left = Math.min(Math.max(0, rp.x), innerWidth - 120) + "px"; rw.style.top = Math.min(Math.max(0, rp.y), innerHeight - 44) + "px"; rw.style.bottom = "auto"; rw.style.right = "auto"; }
+    draggable(rw, "reseau-res-pos");
   }
 
   // ---------- Lancement
