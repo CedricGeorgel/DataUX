@@ -1,0 +1,6 @@
+/* DataUX — couleurs du design system (projet design-system, tokens.json).
+   Recopier ici toute modification des couleurs du DS. Le site suit le réglage clair/sombre de l'appareil. */
+:root,[data-theme="light"]{--ink:#141414;--paper:#ffffff;--surface:#f7f4f1;--line:#c9c2bb;--line-strong:#8f867e;--text-muted:#555555;--accent:#9f6b53;--accent-soft:#c9a898;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#ede8e3;--paper:#211e1b;--surface:#171513;--line:#47403a;--line-strong:#857b73;--text-muted:#aba29a;--accent:#c79479;--accent-soft:#8a5a45;color-scheme:dark}}
+[data-theme="dark"]{--ink:#ede8e3;--paper:#211e1b;--surface:#171513;--line:#47403a;--line-strong:#857b73;--text-muted:#aba29a;--accent:#c79479;--accent-soft:#8a5a45;color-scheme:dark}
+:root{--radius-sm:3px;--radius-pill:12px;--radius-full:50%}

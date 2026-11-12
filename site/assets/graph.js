@@ -496,7 +496,7 @@ function init(G) {
     const p = peopleById.get(pid); if (!p || !FULL) return;
     if (ficheReq) ficheReq.abort();
     shown = "person:" + pid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
-    wTitle.textContent = p.name; wSw.style.background = "var(--muted)";
+    wTitle.textContent = p.name; wSw.style.background = "var(--text-muted)";
     const fs = p.fiches.map(i => byId.get(i)).filter(Boolean)
       .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
     const ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
