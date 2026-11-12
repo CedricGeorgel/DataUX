@@ -28,7 +28,7 @@
     </div>
   </div>
 </div>
-<button class="chev" id="panelBtn" aria-expanded="true" aria-controls="panel" aria-label="Masquer le panneau" title="Masquer le panneau"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<button class="chev" id="panelBtn" aria-expanded="true" aria-controls="panel" aria-label="Masquer le panneau" title="Masquer le panneau"><svg class="tab" viewBox="0 0 29 64" width="29" height="64" aria-hidden="true"><path class="fill" d="M29 0A9 9 0 0 1 20 9H9.5A9 9 0 0 0 .5 18V46A9 9 0 0 0 9.5 55H20A9 9 0 0 1 29 64Z"/><path class="edge" d="M28.5 .5A8.5 8.5 0 0 1 20 9.5H9.5A9 9 0 0 0 .5 18.5V45.5A9 9 0 0 0 9.5 54.5H20A8.5 8.5 0 0 1 28.5 63"/></svg><svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 <aside id="panel" aria-live="polite"></aside>
 <section class="win fiche-win open collapsed" id="win" aria-label="Fiche">
   <div class="whead" data-toggle>
@@ -38,13 +38,7 @@
   </div>
   <div class="wbody" id="ficheBody"><p class="muted">Clique sur un point pour lire sa fiche.</p></div>
 </section>
-<section class="win res-win open" id="resWin" aria-label="Ressources" hidden>
-  <div class="whead">
-    <span class="sw"></span><span class="wt">Ressources</span>
-    <button class="ib" data-collapse aria-expanded="true" aria-label="Replier les ressources" title="Replier">▾</button>
-  </div>
-  <div class="wbody"></div>
-</section>
+<button class="res-btn" id="resBtn" aria-controls="panel" hidden><span class="sw"></span><span class="wt">Ressources</span><span class="muted" id="resCount"></span><span class="go" aria-hidden="true">›</span></button>
 <section class="win legend-win open" id="legendWin" aria-label="Légende">
   <div class="whead">
     <span class="wt">Légende</span>

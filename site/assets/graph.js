@@ -417,7 +417,6 @@ function init(G) {
       const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || a.localeCompare(b, "fr"));
       panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
         <h1 style="margin-top:12px">Ressources</h1>
-        <p class="muted">Templates à imprimer, à remplir à la main ou à redessiner.</p>
         ${kinds.map(k => { const rs = RES.filter(r => (r.kind || "Autres") === k);
           return `<h3>${esc(k)} · ${rs.length}</h3><ul class="links">${rs.map(r => `<li><span class="sw res"></span><button class="lnk" data-res="${esc(r.id)}">${esc(r.name)}</button></li>`).join("")}</ul>`; }).join("")}
         <div class="pfoot">${themeSwitch()}</div>`;
@@ -526,8 +525,12 @@ function init(G) {
       const props = j && j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
       const body = j && j.html.trim() ? j.html : `<p class="muted">Pas encore de mode d'emploi pour cette ressource.</p>`;
       const ls = r.liees.map(i => byId.get(i)).filter(Boolean);
+      // « Télécharger » : la première image de la page Notion de la ressource (copiée dans le site par le build)
+      const imgs = j ? [...j.html.matchAll(/<img src="(data\/img\/[\w.-]+)"/g)].map(m => m[1]) : [];
+      const slug = r.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const dl = imgs.map((img, k) => `<a class="btn" href="${esc(img)}" download="${esc(slug + (imgs.length > 1 ? "-" + (k + 1) : "") + img.slice(img.lastIndexOf(".")))}">Télécharger${imgs.length > 1 ? " " + (k + 1) : ""}</a>`).join("");
       const F = G.forms || {};
-      wBody.innerHTML = props + `<div class="acts" style="margin:0 0 12px"><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir le template ↗</a></div>` + body
+      wBody.innerHTML = props + `<div class="acts" style="margin:0 0 12px"><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir le template ↗</a>${dl}</div>` + body
         + (ls.length ? `<div class="contrib"><h4>Fiches liées</h4><ul class="links">${ls.map(n => item(n)).join("")}</ul></div>` : "")
         + (F.erreur ? `<div class="acts"><a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: r.name, lien: r.url }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a></div>` : "");
       wBody.scrollTop = 0;
@@ -633,24 +636,16 @@ function init(G) {
     draggable(lw, "reseau-legend-pos");
   }
 
-  // ---------- Encart Ressources : ouvre la liste dans le panneau (page complète)
+  // ---------- Bouton Ressources : ouvre directement la liste dans le panneau (page complète)
   if (FULL && RES.length) {
-    const rw = $("resWin"), rb = rw.querySelector(".wbody"), rc = rw.querySelector("[data-collapse]");
-    rw.hidden = false;
-    rb.innerHTML = `<p>${RES.length} template${RES.length > 1 ? "s" : ""} à imprimer : grilles, canvas, guides.</p><button class="btn" data-res-open>Voir la liste</button>`;
-    rb.querySelector("[data-res-open]").onclick = () => {
+    const rbtn = $("resBtn");
+    rbtn.hidden = false; $("resCount").textContent = RES.length;
+    rbtn.onclick = () => {
       if (state.focus) select(null);
       state.panel = "res";
       if (document.body.classList.contains("nopanel")) $("panelBtn").click(); else renderPanel();
+      const first = panel.querySelector("[data-res]"); if (first && !MOB()) first.focus({ preventScroll: true });
     };
-    const setR = c => { rw.classList.toggle("collapsed", c); rc.setAttribute("aria-expanded", !c); rc.setAttribute("aria-label", c ? "Déplier les ressources" : "Replier les ressources"); rc.textContent = c ? "▸" : "▾"; store.set("reseau-res-collapsed", c); };
-    rc.onclick = () => setR(!rw.classList.contains("collapsed"));
-    rw.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setR(!rw.classList.contains("collapsed")); });
-    const savedR = store.get("reseau-res-collapsed");
-    setR(savedR === null ? innerWidth <= 760 : savedR);
-    const rp = store.get("reseau-res-pos");
-    if (rp && innerWidth > 760) { rw.style.left = Math.min(Math.max(0, rp.x), innerWidth - 120) + "px"; rw.style.top = Math.min(Math.max(0, rp.y), innerHeight - 44) + "px"; rw.style.bottom = "auto"; rw.style.right = "auto"; }
-    draggable(rw, "reseau-res-pos");
   }
 
   // ---------- Lancement
