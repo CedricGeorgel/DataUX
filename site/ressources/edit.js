@@ -122,7 +122,7 @@
     if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck]")) return;
     if (el.matches(SMALL)) { if (empty(el)) markLine(el); return; }
     var ok = false;
-    if (el.matches(".bx, .card.d, .card")) ok = !el.querySelector("[data-ck]") && (el.matches(".bx, .card.d") || empty(el));
+    if (el.matches(".bx, .card.d, .card, .lo")) ok = !el.querySelector("[data-ck]") && (el.matches(".bx, .card.d, .lo") || empty(el));
     else if (leaf(el) && empty(el) && !el.matches(".n, i[style*='border-radius:50%'], i[style*='border-radius: 50%']")) {
       var r = el.getBoundingClientRect();
       ok = r.width >= 30 && r.height >= 14;

@@ -24,7 +24,7 @@ td>.ed,th>.ed{vertical-align:top}
 .ed-quote{display:block;min-height:30px;height:30px;margin:2px 0}
 .ed-band{position:absolute;top:5px;right:10px;margin:0}
 .ed-band>.ed{display:flex;align-items:center;white-space:nowrap}
-.ed-side{position:absolute;top:30px;right:10px;bottom:8px;width:calc(25% - 24px);border-left:1px solid var(--line,#c9c2bb);padding-left:10px}
+.ed-side{position:absolute;top:8px;right:10px;bottom:8px;width:calc(25% - 24px);border-left:1px solid var(--line,#c9c2bb);padding-left:10px}
 
 /* Cases à cocher */
 [data-ck]{cursor:pointer}
