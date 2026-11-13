@@ -28,13 +28,13 @@ function showError(msg) {
 async function start() {
   showLoading();
   let r, j;
-  try { r = await fetch(API_GRAPH, { cache: "no-cache" }); }
+  try { r = await fetch(API_GRAPH); }
   catch (e) { return showError("Le site ne répond pas. Vérifie ta connexion, puis réessaie."); }
   if (r.status === 404) return showError("Les données ne sont pas encore publiées. Elles arrivent à la prochaine mise à jour.");
   try { j = await r.json(); } catch (e) { j = null; }
   if (!r.ok || !j || !j.nodes) return showError("Les données sont illisibles (erreur " + r.status + ").");
-  hideScreen();
   init(j);
+  hideScreen();
 }
 start();
 
@@ -225,7 +225,15 @@ function init(G) {
       if (n.small !== undefined) a[n.small] = p; else n.iso = p; });
     return a;
   }
-  const A = anchors();
+  // Disposition gardée dans le navigateur : tant que les fiches, les liens et le code ne changent pas,
+  // on réutilise les positions calculées à la visite précédente (le calcul prend près d'une seconde).
+  const LKEY = "reseau-layout", VER = (/\?v=(\w+)/.exec([...document.scripts].map(x => x.src).join(" ")) || [])[1] || "";
+  const lsig = (() => { const str = VER + JSON.stringify([G.nodes.map(n => [n.id, n.comm]), G.edges, G.conf, C.map(c => c.small)]);
+    let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + str.length; })();
+  let cached = store.get(LKEY); if (!cached || cached.sig !== lsig || !cached.p) cached = null;
+  if (cached && !G.nodes.every(n => cached.p[n.id])) cached = null;
+  const A = cached ? cached.A : anchors();
+  if (cached) G.nodes.forEach(n => { const c = cached.p[n.id]; if (c[2]) n.iso = c[2]; if (c[3]) n.nearComm = true; });
   const ax = d => d.comm < 0 ? d.iso[0] : A[d.comm][0], ay = d => d.comm < 0 ? d.iso[1] : A[d.comm][1];
   const rad = n => 4 + Math.sqrt(n.deg) * 2.6;
   const sim = d3.forceSimulation().alphaDecay(.025)
@@ -238,6 +246,7 @@ function init(G) {
     .force("collide", d3.forceCollide(d => rad(d) + 5));
   const rndN = d3.randomLcg(3); sim.randomSource(d3.randomLcg(5));
   G.nodes.forEach(n => { n.x = ax(n) + (rndN() - .5) * 40; n.y = ay(n) + (rndN() - .5) * 40; });
+  if (cached) G.nodes.forEach(n => { n.x = cached.p[n.id][0]; n.y = cached.p[n.id][1]; });
 
   let nodeSel, edgeSel, visNodes = [], visEdges = [];
   function update() {
@@ -668,7 +677,12 @@ function init(G) {
   if (MOB()) { document.body.classList.add("nopanel"); $("panelBtn").setAttribute("aria-expanded", false); }
   update(); renderPanel(); fitBar();
   if (document.fonts) document.fonts.ready.then(() => fitBar());
-  sim.stop(); for (let i = 0; i < 350; i++) sim.tick(); sim.on("tick")(); sim.alpha(.05).restart();
+  sim.stop();
+  if (!cached) { for (let i = 0; i < 350; i++) sim.tick();
+    const p = {}; G.nodes.forEach(n => { p[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10, n.iso || 0, n.nearComm ? 1 : 0]; });
+    store.set(LKEY, { sig: lsig, A, p }); }
+  else G.nodes.forEach(n => { n.vx = 0; n.vy = 0; });
+  sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
   addEventListener("resize", () => { fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 0); });
   const deep = location.hash.slice(1).replace(/-/g, "").toLowerCase();
