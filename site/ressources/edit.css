@@ -47,6 +47,23 @@ td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-l
 .emo-pick button{font-size:20px;line-height:1;background:none;border:0;border-radius:3px;padding:3px 0;cursor:pointer}
 .emo-pick button:hover,.emo-pick button:focus-visible{background:#f7f4f1;outline:0}
 .emo-pick .clr{grid-column:1/-1;font:12px/1.2 'Cactus Classical Serif',Georgia,serif;color:#555;padding:5px 0}
+/* Photo du persona */
+.ph{cursor:pointer;overflow:hidden}
+.ph:hover,.ph:focus-visible{opacity:.6!important;outline:0}
+.ph.ph-set{opacity:1!important;border-style:solid!important}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph-panel{position:absolute;z-index:20;width:230px;padding:12px;background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.18);font:12px/1.3 'Cactus Classical Serif',Georgia,serif;color:#141414}
+.ph-panel button{font:inherit;color:inherit;background:#f7f4f1;border:0;border-radius:3px;padding:5px 8px;cursor:pointer}
+.ph-panel button:hover{background:#ede6e0}
+.ph-panel button:focus-visible{outline:2px solid #9f6b53;outline-offset:1px}
+.ph-up{width:100%;background:#9f6b53!important;color:#fff!important}
+.ph-h{margin:12px 0 6px;color:#555}
+.ph-row{display:grid;grid-template-columns:1fr 26px 54px 26px;align-items:center;gap:4px;margin:3px 0}
+.ph-row button{padding:3px 0}
+.ph-val{text-align:center;color:#555;font-size:11px}
+.ph-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.ph-ok{margin-left:auto}
+@media print{.ph-panel{display:none}}
 /* Post-its (Matrice Impact/effort), aux couleurs du DS */
 .tb-below{display:flex;justify-content:center;padding:4px 16px 32px}
 .btn-note{font:14px/1.2 'Cactus Classical Serif',Georgia,serif;color:#fff;background:#9f6b53;border:0;border-radius:3px;padding:10px 18px;cursor:pointer}

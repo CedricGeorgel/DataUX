@@ -155,7 +155,7 @@
   // Petits ronds d'une échelle (ex. Aisance numérique du persona)
   root.querySelectorAll(".z i").forEach(function (i) {
     var s = i.getAttribute("style") || "";
-    if (/border-radius:\s*50%/.test(s) && /width:\s*11px/.test(s)) addCheck(i, "");
+    if (/border-radius:\s*50%/.test(s) && /width:\s*11px/.test(s)) { addCheck(i, ""); i.setAttribute("data-radio", ""); }
   });
   var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), texts = [];
   while (walker.nextNode()) if (/[☐○]/.test(walker.currentNode.nodeValue)) texts.push(walker.currentNode);
@@ -174,6 +174,8 @@
       // Kano : une seule réponse par question
       var grp = calc && calc.kind === "kano" && el.closest(".cbl");
       if (on && grp) grp.querySelectorAll("[data-ck]").forEach(function (o) { if (o !== el) setCheck(o, false); });
+      // Échelle à ronds (aisance numérique) : un seul choix
+      if (on && el.hasAttribute("data-radio")) el.parentElement.querySelectorAll("[data-radio]").forEach(function (o) { if (o !== el) setCheck(o, false); });
       setCheck(el, on); save();
     }
     el.addEventListener("click", toggle);
@@ -337,6 +339,90 @@
     notes.push(n); return n;
   }
 
+  /* 4 ter. Photo du persona : import d'une image ou avatar généré (DiceBear Notionists, CC0) */
+  var photoEl = null, photo = null, phPanel = null;
+  root.querySelectorAll("div").forEach(function (d) {
+    var st = d.getAttribute("style") || "";
+    if (!photoEl && /border-radius:\s*50%/.test(st) && /width:\s*84px/.test(st)) photoEl = d;
+  });
+  var AV_KEYS = [["hair", "Cheveux"], ["eyes", "Yeux"], ["brows", "Sourcils"], ["nose", "Nez"], ["lips", "Bouche"], ["beard", "Barbe"], ["glasses", "Lunettes"], ["body", "Tenue"]];
+  var OPTIONAL = { beard: 1, glasses: 1 };
+  function loadAv(cb) {
+    if (window.DataUXAvatar) return cb();
+    var me = (document.querySelector('script[src*="edit.js"]') || { src: "" }).src, q = me.indexOf("?");
+    var sc = mk("script"); sc.src = "vendor/avatar.js" + (q >= 0 ? me.slice(q) : "");
+    sc.onload = cb; document.head.appendChild(sc);
+  }
+  function avList(k) { var l = window.DataUXAvatar.options[k].slice(); return OPTIONAL[k] ? [""].concat(l) : l; }
+  function randAv() {
+    var o = {};
+    AV_KEYS.forEach(function (k) { var l = avList(k[0]); o[k[0]] = l[Math.floor(Math.random() * l.length)]; });
+    if (Math.random() < .7) o.beard = ""; if (Math.random() < .7) o.glasses = "";
+    return o;
+  }
+  function renderPhoto() {
+    if (!photoEl) return;
+    photoEl.innerHTML = "";
+    if (!photo) { photoEl.textContent = "photo"; photoEl.classList.remove("ph-set"); return; }
+    var src = photo.type === "img" ? photo.src : "data:image/svg+xml;charset=utf-8," + encodeURIComponent(window.DataUXAvatar.svg(photo.o));
+    var img = mk("img"); img.src = src; img.alt = "Photo du persona"; photoEl.appendChild(img); photoEl.classList.add("ph-set");
+  }
+  function closePh() { if (phPanel) { phPanel.remove(); phPanel = null; } }
+  function openPh() {
+    closePh();
+    phPanel = mk("div", "ph-panel"); phPanel.setAttribute("role", "dialog"); phPanel.setAttribute("aria-label", "Photo du persona");
+    var up = mk("button", "ph-up"); up.type = "button"; up.textContent = "Importer une photo";
+    var file = mk("input"); file.type = "file"; file.accept = "image/*"; file.hidden = true;
+    up.addEventListener("click", function () { file.click(); });
+    file.addEventListener("change", function () {
+      var f = file.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var im = new Image();
+        im.onload = function () {
+          // Réduite à 320 px et recadrée en carré : légère à garder dans le navigateur
+          var c = document.createElement("canvas"), z = 320, sd = Math.min(im.width, im.height);
+          c.width = c.height = z;
+          c.getContext("2d").drawImage(im, (im.width - sd) / 2, (im.height - sd) / 2, sd, sd, 0, 0, z, z);
+          photo = { type: "img", src: c.toDataURL("image/jpeg", .85) }; renderPhoto(); save(); closePh();
+        };
+        im.src = rd.result;
+      };
+      rd.readAsDataURL(f);
+    });
+    phPanel.appendChild(up); phPanel.appendChild(file);
+    var gen = mk("div", "ph-gen"); gen.innerHTML = '<p class="ph-h">Ou générer un avatar</p>';
+    phPanel.appendChild(gen);
+    loadAv(function () {
+      if (!photo || photo.type !== "av") { photo = { type: "av", o: randAv() }; renderPhoto(); save(); }
+      AV_KEYS.forEach(function (k) {
+        var row = mk("div", "ph-row"), lab = mk("span"), prev = mk("button"), val = mk("span", "ph-val"), next = mk("button");
+        lab.textContent = k[1]; prev.type = next.type = "button"; prev.textContent = "‹"; next.textContent = "›";
+        prev.setAttribute("aria-label", k[1] + " précédent"); next.setAttribute("aria-label", k[1] + " suivant");
+        function show() { var l = avList(k[0]), i = l.indexOf(photo.o[k[0]]); val.textContent = photo.o[k[0]] ? (i + (OPTIONAL[k[0]] ? 0 : 1)) + " / " + (l.length - (OPTIONAL[k[0]] ? 1 : 0)) : "aucun"; }
+        function step(d) { var l = avList(k[0]), i = l.indexOf(photo.o[k[0]]); photo.o[k[0]] = l[(i + d + l.length) % l.length]; show(); renderPhoto(); save(); }
+        prev.addEventListener("click", function () { step(-1); }); next.addEventListener("click", function () { step(1); });
+        show(); row.appendChild(lab); row.appendChild(prev); row.appendChild(val); row.appendChild(next); gen.appendChild(row);
+      });
+      var acts = mk("div", "ph-acts"), rnd = mk("button"), del = mk("button"), ok = mk("button", "ph-ok");
+      rnd.type = del.type = ok.type = "button"; rnd.textContent = "Aléatoire"; del.textContent = "Retirer la photo"; ok.textContent = "OK";
+      rnd.addEventListener("click", function () { photo = { type: "av", o: randAv() }; renderPhoto(); save(); openPh(); });
+      del.addEventListener("click", function () { photo = null; renderPhoto(); save(); closePh(); });
+      ok.addEventListener("click", closePh);
+      acts.appendChild(rnd); acts.appendChild(del); acts.appendChild(ok); gen.appendChild(acts);
+    });
+    var r = photoEl.getBoundingClientRect();
+    phPanel.style.left = (r.right + 12 + window.scrollX) + "px"; phPanel.style.top = (r.top + window.scrollY) + "px";
+    document.body.appendChild(phPanel);
+  }
+  if (photoEl) {
+    photoEl.classList.add("ph"); photoEl.setAttribute("role", "button"); photoEl.setAttribute("tabindex", "0"); photoEl.setAttribute("aria-label", "Ajouter une photo ou un avatar");
+    photoEl.addEventListener("click", openPh);
+    photoEl.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPh(); } });
+    document.addEventListener("click", function (e) { if (phPanel && !phPanel.contains(e.target) && !photoEl.contains(e.target)) closePh(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePh(); });
+  }
+
   /* 5. Sauvegarde locale */
   var timer;
   function save() {
@@ -345,7 +431,8 @@
     timer = setTimeout(function () {
       var data = { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }),
         m: emos.map(function (el) { return el.textContent; }),
-        p: notes.map(function (n) { return { x: n.offsetLeft, y: n.offsetTop, t: n.querySelector(".pi-t").innerHTML }; }) };
+        p: notes.map(function (n) { return { x: n.offsetLeft, y: n.offsetTop, t: n.querySelector(".pi-t").innerHTML }; }),
+        ph: photo };
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
     }, 300);
   }
@@ -357,6 +444,7 @@
       if (saved.c && saved.c.length === checks.length) checks.forEach(function (el, i) { setCheck(el, !!saved.c[i]); });
       if (saved.m && saved.m.length === emos.length) emos.forEach(function (el, i) { setEmo(el, saved.m[i]); });
       if (NOTES && saved.p) saved.p.forEach(function (d) { addNote(d); });
+      if (saved.ph && photoEl) { photo = saved.ph; if (photo.type === "av") loadAv(renderPhoto); else renderPhoto(); }
     } catch (err) { /* rien à restaurer */ }
   }
 
