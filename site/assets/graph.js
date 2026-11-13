@@ -28,7 +28,7 @@ function showError(msg) {
 async function start() {
   showLoading();
   let r, j;
-  try { r = await fetch(API_GRAPH); }
+  try { r = await fetch(API_GRAPH, { cache: "no-cache" }); }
   catch (e) { return showError("Le site ne répond pas. Vérifie ta connexion, puis réessaie."); }
   if (r.status === 404) return showError("Les données ne sont pas encore publiées. Elles arrivent à la prochaine mise à jour.");
   try { j = await r.json(); } catch (e) { j = null; }
