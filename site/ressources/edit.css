@@ -52,11 +52,13 @@ td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-l
 .jal-line::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px}
 .jal{position:absolute;top:50%;width:0;z-index:3}
 .jal-m{position:absolute;left:-5px;top:-5px;width:9px;height:9px;background:var(--accent,#9f6b53);transform:rotate(45deg);cursor:ew-resize}
-.jal-l,.jal-d{position:absolute;left:-50px;width:100px;text-align:center;white-space:nowrap;overflow:hidden;cursor:text;height:auto}
-.jal-l{bottom:7px;font-size:8.5px;line-height:1.1}
-.jal-d{top:7px;font-size:7.5px;line-height:1.1;color:var(--text-muted,#555)}
-.jal-x{position:absolute;left:6px;top:-14px;border:0;background:none;padding:0 2px;font-size:11px;line-height:1;color:#8f867e;cursor:pointer;opacity:0}
+.jal-l,.jal-d{position:absolute;left:-60px;width:120px;text-align:center;white-space:nowrap;overflow:hidden;cursor:text;height:auto;min-height:15px;padding:2px 4px;box-sizing:border-box;border-radius:2px}
+.jal-l{bottom:7px;font-size:9.5px;line-height:1.2}
+.jal-d{top:7px;font-size:8.5px;line-height:1.2;color:var(--text-muted,#555)}
+.jal-l:hover,.jal-d:hover{background:rgba(159,107,83,.07)}
+.jal-x{position:absolute;left:-8px;top:-42px;width:16px;height:16px;border:0;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #c9c2bb;padding:0;font-size:13px;line-height:16px;text-align:center;color:#141414;cursor:pointer;opacity:.55}
 .jal:hover .jal-x,.jal:focus-within .jal-x{opacity:1}
+.jal-x:hover{background:#141414;color:#fff;box-shadow:none}
 .capturing .jal .ed:empty::before,.capturing .jal-x{visibility:hidden}
 @media print{.jal .ed:empty::before,.jal-x{visibility:hidden}}
 /* Photo du persona */
