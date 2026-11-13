@@ -56,7 +56,7 @@ td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-l
 .jal-l{bottom:7px;font-size:9.5px;line-height:1.2}
 .jal-d{top:7px;font-size:8.5px;line-height:1.2;color:var(--text-muted,#555)}
 .jal-l:hover,.jal-d:hover{background:rgba(159,107,83,.07)}
-.jal-x{position:absolute;left:-8px;top:-42px;width:16px;height:16px;border:0;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #c9c2bb;padding:0;font-size:13px;line-height:16px;text-align:center;color:#141414;cursor:pointer;opacity:.55}
+.jal-x{position:absolute;left:60px;top:-23px;width:16px;height:16px;border:0;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #c9c2bb;padding:0;font-size:13px;line-height:16px;text-align:center;color:#141414;cursor:pointer;opacity:.55}
 .jal:hover .jal-x,.jal:focus-within .jal-x{opacity:1}
 .jal-x:hover{background:#141414;color:#fff;box-shadow:none}
 .capturing .jal .ed:empty::before,.capturing .jal-x{visibility:hidden}
