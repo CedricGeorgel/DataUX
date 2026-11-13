@@ -273,7 +273,8 @@
 
   /* 4 bis. Émojis du parcours et post-its de la Matrice */
   var emos = [], notes = [], notesLayer = null;
-  var EMOJIS = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "🙂", "😉", "😌", "😇", "🥰", "😍", "🤩", "😘", "❤️", "🤗", "🥳", "😎", "🤓", "🧐", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😒", "😬", "😮‍💨", "😔", "😪", "😴", "🥱", "😮", "😯", "😲", "😳", "🥺", "😕", "😟", "🙁", "☹️", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "😤", "😠", "😡", "🤬", "🤢", "🤮", "😵‍💫", "🤯", "💔"];
+  // Bande du haut : émotions positives ; milieu : neutres ; bas : négatives
+  var EMOJIS = [["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "🙂", "😉", "😌", "😇", "😋", "😎", "🤓", "🤗", "🥰", "😍", "🤩", "😘", "🥳", "❤️", "👍"], ["😐", "😑", "😶", "🤔", "🧐", "🤨", "🙄", "😏", "😬", "😮", "😯", "😲", "😳", "😴", "🥱", "😪", "😮‍💨", "🤷"], ["😕", "😟", "🙁", "☹️", "😔", "😒", "🥺", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "😤", "😠", "😡", "🤬", "🤢", "🤮", "😵‍💫", "🤯", "💔", "👎"]];
   var picker = null;
   function closePicker() { if (picker) { picker.remove(); picker = null; } }
   document.addEventListener("click", function (e) { if (picker && !picker.contains(e.target) && !e.target.closest(".emo")) closePicker(); });
@@ -284,18 +285,19 @@
     var head = root.querySelector("thead tr"); if (!head) return;
     var rr = root.getBoundingClientRect();
     // Trois bandes (haut, milieu, bas) : un emplacement par étape dans chacune
-    emoBand.forEach(function (band) {
+    emoBand.forEach(function (band, bi) {
     var br = band.getBoundingClientRect(), top = br.top - rr.top, bot = br.bottom - rr.top;
     Array.prototype.slice.call(head.children, 1).forEach(function (th) {
       var r = th.getBoundingClientRect();
-      var slot = mk("button", "emo"); slot.type = "button";
+      var slot = mk("button", "emo"); slot.type = "button"; slot.setAttribute("data-band", Math.min(bi, 2));
       slot.style.left = (r.left - rr.left) + "px"; slot.style.width = r.width + "px";
       slot.style.top = top + "px"; slot.style.height = (bot - top) + "px";
       setEmo(slot, "");
       slot.addEventListener("click", function (e) {
         e.stopPropagation(); closePicker();
         picker = mk("div", "emo-pick"); picker.setAttribute("role", "listbox");
-        EMOJIS.concat([""]).forEach(function (em) {
+        var list = emoBand.length === 3 ? EMOJIS[+slot.getAttribute("data-band")] : EMOJIS[0].concat(EMOJIS[1], EMOJIS[2]);
+        list.concat([""]).forEach(function (em) {
           var b = mk("button"); b.type = "button"; b.textContent = em || "Effacer"; if (!em) b.className = "clr";
           b.addEventListener("click", function () { setEmo(slot, em); closePicker(); save(); slot.focus(); });
           picker.appendChild(b);
