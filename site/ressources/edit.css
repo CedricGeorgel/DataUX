@@ -37,6 +37,24 @@ i[data-ck].on{background:#141414;box-shadow:inset 0 0 0 2px #fff}
 td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-left:3px!important;padding-right:3px!important}
 .calc-v{display:block;color:var(--ink,#141414);font-size:10px;text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden}
 .ed.bad{color:#c0392b}
+/* Émojis du parcours : un emplacement fixe par étape */
+.emo{position:absolute;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;font-size:24px;line-height:1;font-family:inherit;color:var(--line-strong,#8f867e)}
+.emo:not(.set)::before{content:"+";font-size:14px;opacity:.5}
+.emo:hover:not(.set)::before{opacity:1}
+.emo:focus-visible{outline:2px solid #9f6b53;outline-offset:-4px}
+.emo-pick{position:absolute;z-index:20;width:220px;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:6px;background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.emo-pick button{font-size:20px;line-height:1;background:none;border:0;border-radius:3px;padding:3px 0;cursor:pointer}
+.emo-pick button:hover,.emo-pick button:focus-visible{background:#f7f4f1;outline:0}
+.emo-pick .clr{grid-column:1/-1;font:12px/1.2 'Cactus Classical Serif',Georgia,serif;color:#555;padding:5px 0}
+/* Post-its (Matrice Impact/effort), aux couleurs du DS */
+.pi{position:absolute;z-index:5;width:118px;min-height:78px;background:#f1e5de;border-radius:2px;box-shadow:0 2px 6px rgba(20,20,20,.18);display:flex;flex-direction:column}
+.pi-grip{height:14px;cursor:grab;flex:none;background:rgba(159,107,83,.12)}
+.pi-grip:active{cursor:grabbing}
+.pi-del{position:absolute;top:0;right:2px;height:14px;padding:0 3px;border:0;background:none;font-size:13px;line-height:14px;color:#8f867e;cursor:pointer}
+.pi-del:hover{color:#141414}
+.pi-t{flex:1;padding:4px 7px 6px;height:64px;font-size:10.5px}
+.capturing .emo:not(.set)::before,.capturing .pi-del{visibility:hidden}
+@media print{.emo:not(.set)::before,.pi-del{visibility:hidden}.emo-pick{display:none}}
 .capturing .ed:focus{background:none;box-shadow:none}
 @media print{.tb{display:none}.ed:focus{background:none;box-shadow:none}}
 @media (max-width:760px){.tb{font-size:12px}}

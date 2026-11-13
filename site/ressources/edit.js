@@ -93,6 +93,16 @@
     });
   }
 
+  /* 0 bis. Parcours : bande « Émotions » (lignes à cellule fusionnée) réservée aux émojis */
+  var emoBand = [];
+  root.querySelectorAll("td.n").forEach(function (td) {
+    if (txt(td) !== "émotions") return;
+    var tr = td.parentElement, rows = [tr.previousElementSibling, tr, tr.nextElementSibling];
+    rows.forEach(function (r) {
+      if (r && r.querySelector("td[colspan]")) { emoBand.push(r); r.querySelectorAll("td[colspan]").forEach(function (c) { c.setAttribute("data-calc", ""); }); }
+    });
+  });
+
   /* 1. Préparation : transformer les gabarits texte en champs */
 
   // a. Traits de soulignement « ____ » : l'élément entier ou chaque série devient un champ
@@ -254,9 +264,72 @@
       });
       eds.push(w);
     });
+    root.style.position = "relative";
+    setupEmos();
     restore();
     recalc();
   });
+
+  /* 4 bis. Émojis du parcours et post-its de la Matrice */
+  var emos = [], notes = [], notesLayer = null;
+  var EMOJIS = ["😄", "😊", "🙂", "😌", "😐", "🤔", "😮", "😕", "🙁", "😟", "😢", "😰", "😤", "😡", "😴", "🤩"];
+  var picker = null;
+  function closePicker() { if (picker) { picker.remove(); picker = null; } }
+  document.addEventListener("click", function (e) { if (picker && !picker.contains(e.target) && !e.target.closest(".emo")) closePicker(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePicker(); });
+  function setEmo(slot, v) { slot.textContent = v || ""; slot.classList.toggle("set", !!v); slot.setAttribute("aria-label", v ? "Émotion " + v + ", changer" : "Choisir une émotion"); }
+  function setupEmos() {
+    if (!emoBand.length) return;
+    var head = root.querySelector("thead tr"); if (!head) return;
+    var rr = root.getBoundingClientRect();
+    var top = emoBand[0].getBoundingClientRect().top - rr.top, bot = emoBand[emoBand.length - 1].getBoundingClientRect().bottom - rr.top;
+    Array.prototype.slice.call(head.children, 1).forEach(function (th) {
+      var r = th.getBoundingClientRect();
+      var slot = mk("button", "emo"); slot.type = "button";
+      slot.style.left = (r.left - rr.left) + "px"; slot.style.width = r.width + "px";
+      slot.style.top = top + "px"; slot.style.height = (bot - top) + "px";
+      setEmo(slot, "");
+      slot.addEventListener("click", function (e) {
+        e.stopPropagation(); closePicker();
+        picker = mk("div", "emo-pick"); picker.setAttribute("role", "listbox");
+        EMOJIS.concat([""]).forEach(function (em) {
+          var b = mk("button"); b.type = "button"; b.textContent = em || "Effacer"; if (!em) b.className = "clr";
+          b.addEventListener("click", function () { setEmo(slot, em); closePicker(); save(); slot.focus(); });
+          picker.appendChild(b);
+        });
+        var sr = slot.getBoundingClientRect();
+        picker.style.left = Math.max(8, sr.left + sr.width / 2 - 110 + window.scrollX) + "px";
+        picker.style.top = (sr.bottom + 4 + window.scrollY) + "px";
+        document.body.appendChild(picker);
+        picker.querySelector("button").focus();
+      });
+      root.appendChild(slot); emos.push(slot);
+    });
+  }
+  // Post-its : seulement sur la Matrice Impact/effort
+  var NOTES = /matrice-impact-effort/.test(location.pathname);
+  function addNote(d) {
+    d = d || { x: 120 + notes.length * 14 % 140, y: 140 + notes.length * 14 % 140, t: "" };
+    var n = mk("div", "pi"); n.style.left = d.x + "px"; n.style.top = d.y + "px";
+    var grip = mk("div", "pi-grip"); grip.setAttribute("aria-hidden", "true");
+    var del = mk("button", "pi-del"); del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label", "Supprimer ce post-it");
+    var t = mk("div", "pi-t"); t.setAttribute("contenteditable", "true"); t.setAttribute("data-ph", "Idée…"); t.className = "pi-t ed"; t.innerHTML = d.t || "";
+    n.appendChild(grip); n.appendChild(del); n.appendChild(t); root.appendChild(n);
+    del.addEventListener("click", function () { notes.splice(notes.indexOf(n), 1); n.remove(); save(); });
+    t.addEventListener("input", save);
+    t.addEventListener("paste", function (e) { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain")); });
+    grip.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); grip.setPointerCapture(e.pointerId);
+      var sx = e.clientX, sy = e.clientY, ox = n.offsetLeft, oy = n.offsetTop;
+      function mv(ev) {
+        n.style.left = Math.min(root.clientWidth - n.offsetWidth, Math.max(0, ox + ev.clientX - sx)) + "px";
+        n.style.top = Math.min(root.clientHeight - n.offsetHeight, Math.max(0, oy + ev.clientY - sy)) + "px";
+      }
+      function up() { grip.removeEventListener("pointermove", mv); grip.removeEventListener("pointerup", up); save(); }
+      grip.addEventListener("pointermove", mv); grip.addEventListener("pointerup", up);
+    });
+    notes.push(n); return n;
+  }
 
   /* 5. Sauvegarde locale */
   var timer;
@@ -264,7 +337,9 @@
     recalc();
     clearTimeout(timer);
     timer = setTimeout(function () {
-      var data = { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }) };
+      var data = { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }),
+        m: emos.map(function (el) { return el.textContent; }),
+        p: notes.map(function (n) { return { x: n.offsetLeft, y: n.offsetTop, t: n.querySelector(".pi-t").innerHTML }; }) };
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
     }, 300);
   }
@@ -274,13 +349,16 @@
       if (!saved || saved.v !== 2) return;
       if (saved.e && saved.e.length === eds.length) eds.forEach(function (el, i) { el.innerHTML = saved.e[i]; });
       if (saved.c && saved.c.length === checks.length) checks.forEach(function (el, i) { setCheck(el, !!saved.c[i]); });
+      if (saved.m && saved.m.length === emos.length) emos.forEach(function (el, i) { setEmo(el, saved.m[i]); });
+      if (NOTES && saved.p) saved.p.forEach(function (d) { addNote(d); });
     } catch (err) { /* rien à restaurer */ }
   }
 
   /* 6. Barre d'outils */
   var slug = location.pathname.split("/").pop().replace(/\.html$/, "") || "fiche";
   var bar = mk("div", "tb");
-  bar.innerHTML = '<button type="button" data-a="png">Enregistrer en image</button>' +
+  bar.innerHTML = (NOTES ? '<button type="button" data-a="note">Ajouter un post-it</button>' : '') +
+    '<button type="button" data-a="png">Enregistrer en image</button>' +
     '<button type="button" data-a="print">Imprimer / PDF</button>' +
     '<button type="button" data-a="clear">Tout effacer</button>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
@@ -289,7 +367,8 @@
   bar.addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     var a = b.getAttribute("data-a");
-    if (a === "print") window.print();
+    if (a === "note") { var n = addNote(); n.querySelector(".pi-t").focus(); save(); }
+    else if (a === "print") window.print();
     else if (a === "clear") {
       if (!confirm("Effacer tout ce qui a été saisi sur cette fiche ?")) return;
       try { localStorage.removeItem(KEY); } catch (err) {}
