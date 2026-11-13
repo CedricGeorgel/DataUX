@@ -273,7 +273,7 @@
 
   /* 4 bis. Émojis du parcours et post-its de la Matrice */
   var emos = [], notes = [], notesLayer = null;
-  var EMOJIS = ["😄", "😊", "🙂", "😌", "😐", "🤔", "😮", "😕", "🙁", "😟", "😢", "😰", "😤", "😡", "😴", "🤩"];
+  var EMOJIS = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "🙂", "😉", "😌", "😇", "🥰", "😍", "🤩", "😘", "❤️", "🤗", "🥳", "😎", "🤓", "🧐", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😒", "😬", "😮‍💨", "😔", "😪", "😴", "🥱", "😮", "😯", "😲", "😳", "🥺", "😕", "😟", "🙁", "☹️", "😦", "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "😤", "😠", "😡", "🤬", "🤢", "🤮", "😵‍💫", "🤯", "💔"];
   var picker = null;
   function closePicker() { if (picker) { picker.remove(); picker = null; } }
   document.addEventListener("click", function (e) { if (picker && !picker.contains(e.target) && !e.target.closest(".emo")) closePicker(); });
@@ -283,7 +283,9 @@
     if (!emoBand.length) return;
     var head = root.querySelector("thead tr"); if (!head) return;
     var rr = root.getBoundingClientRect();
-    var top = emoBand[0].getBoundingClientRect().top - rr.top, bot = emoBand[emoBand.length - 1].getBoundingClientRect().bottom - rr.top;
+    // Trois bandes (haut, milieu, bas) : un emplacement par étape dans chacune
+    emoBand.forEach(function (band) {
+    var br = band.getBoundingClientRect(), top = br.top - rr.top, bot = br.bottom - rr.top;
     Array.prototype.slice.call(head.children, 1).forEach(function (th) {
       var r = th.getBoundingClientRect();
       var slot = mk("button", "emo"); slot.type = "button";
@@ -299,12 +301,13 @@
           picker.appendChild(b);
         });
         var sr = slot.getBoundingClientRect();
-        picker.style.left = Math.max(8, sr.left + sr.width / 2 - 110 + window.scrollX) + "px";
+        picker.style.left = Math.max(8, sr.left + sr.width / 2 - 165 + window.scrollX) + "px";
         picker.style.top = (sr.bottom + 4 + window.scrollY) + "px";
         document.body.appendChild(picker);
         picker.querySelector("button").focus();
       });
       root.appendChild(slot); emos.push(slot);
+    });
     });
   }
   // Post-its : seulement sur la Matrice Impact/effort

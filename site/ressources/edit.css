@@ -38,11 +38,12 @@ td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-l
 .calc-v{display:block;color:var(--ink,#141414);font-size:10px;text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden}
 .ed.bad{color:#c0392b}
 /* Émojis du parcours : un emplacement fixe par étape */
-.emo{position:absolute;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;font-size:24px;line-height:1;font-family:inherit;color:var(--line-strong,#8f867e)}
-.emo:not(.set)::before{content:"+";font-size:14px;opacity:.5}
+.emo{position:absolute;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;cursor:pointer;font-size:17px;line-height:1;font-family:inherit;color:var(--line-strong,#8f867e)}
+.emo:not(.set)::before{content:"+";font-size:12px;opacity:.25}
+.emo:hover:not(.set)::before,.emo:focus-visible:not(.set)::before{opacity:.8}
 .emo:hover:not(.set)::before{opacity:1}
 .emo:focus-visible{outline:2px solid #9f6b53;outline-offset:-4px}
-.emo-pick{position:absolute;z-index:20;width:220px;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:6px;background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.18)}
+.emo-pick{position:absolute;z-index:20;width:330px;display:grid;grid-template-columns:repeat(11,1fr);gap:2px;padding:6px;background:#fff;border-radius:4px;box-shadow:0 4px 18px rgba(0,0,0,.18)}
 .emo-pick button{font-size:20px;line-height:1;background:none;border:0;border-radius:3px;padding:3px 0;cursor:pointer}
 .emo-pick button:hover,.emo-pick button:focus-visible{background:#f7f4f1;outline:0}
 .emo-pick .clr{grid-column:1/-1;font:12px/1.2 'Cactus Classical Serif',Georgia,serif;color:#555;padding:5px 0}
