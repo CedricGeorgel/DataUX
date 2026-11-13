@@ -8,7 +8,7 @@
   if (!root) return;
   var KEY = "dataux-fiche:" + location.pathname;
   var NB = /[\s ​]/g;
-  var eds = [], checks = [];
+  var eds = [], checks = [], tlLines = [];
 
   function empty(el) { return el.textContent.replace(NB, "") === ""; }
   function leaf(el) {
@@ -203,6 +203,7 @@
     // Frise (largeur 75 %) : l'espace libre à droite sert aux livrables
     var tl = z.querySelector(':scope > div[style*="width:75%"]');
     if (tl) { var side = mk("div", "ed-side"); z.appendChild(side); markBlock(side); }
+    if (tl) tlLines.push(tl);
     // Matrice Impact/effort : on y pose des post-its, pas de zone d'écriture
     if (!tl && !zoneHasField(z) && !zoneText(z) && !/matrice-impact-effort/.test(location.pathname)) { var lo = mk("div", "lo"); z.appendChild(lo); }
   });
@@ -269,6 +270,7 @@
     });
     root.style.position = "relative";
     setupEmos();
+    setupJals();
     restore();
     recalc();
   });
@@ -423,6 +425,45 @@
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closePh(); });
   }
 
+  /* 4 quater. Jalons sur la frise (Cadrage UXR) : clic sur la ligne pour en poser un */
+  var jals = [], jalLine = null;
+  function addJal(d) {
+    if (!jalLine) return null;
+    var j = mk("div", "jal"); j.style.left = d.x + "%";
+    var mark = mk("i", "jal-m"); mark.setAttribute("title", "Glisser pour déplacer");
+    var lab = mk("div", "jal-l ed"); lab.setAttribute("contenteditable", "true"); lab.setAttribute("data-ph", "Jalon"); lab.innerHTML = d.l || "";
+    var dat = mk("div", "jal-d ed"); dat.setAttribute("contenteditable", "true"); dat.setAttribute("data-ph", "date"); dat.innerHTML = d.d || "";
+    var del = mk("button", "jal-x"); del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label", "Supprimer ce jalon");
+    j.appendChild(lab); j.appendChild(mark); j.appendChild(dat); j.appendChild(del);
+    [lab, dat].forEach(function (f) {
+      f.addEventListener("input", save);
+      f.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); });
+      f.addEventListener("paste", function (e) { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain").replace(/\s+/g, " ")); });
+    });
+    del.addEventListener("click", function (e) { e.stopPropagation(); jals.splice(jals.indexOf(j), 1); j.remove(); save(); });
+    mark.addEventListener("pointerdown", function (e) {
+      e.preventDefault(); e.stopPropagation(); mark.setPointerCapture(e.pointerId);
+      var r = jalLine.getBoundingClientRect();
+      function mv(ev) { j.style.left = Math.min(98, Math.max(2, (ev.clientX - r.left) / r.width * 100)) + "%"; }
+      function up() { mark.removeEventListener("pointermove", mv); mark.removeEventListener("pointerup", up); save(); }
+      mark.addEventListener("pointermove", mv); mark.addEventListener("pointerup", up);
+    });
+    j.addEventListener("click", function (e) { e.stopPropagation(); });
+    jalLine.appendChild(j); jals.push(j); return j;
+  }
+  function setupJals() {
+    if (!tlLines.length) return;
+    jalLine = tlLines[0].querySelector('div[style*="align-items:center"]');
+    if (!jalLine) return;
+    jalLine.classList.add("jal-line");
+    jalLine.setAttribute("title", "Cliquer sur la ligne pour poser un jalon");
+    jalLine.addEventListener("click", function (e) {
+      var r = jalLine.getBoundingClientRect();
+      var j = addJal({ x: Math.min(98, Math.max(2, (e.clientX - r.left) / r.width * 100)) });
+      if (j) { j.querySelector(".jal-l").focus(); save(); }
+    });
+  }
+
   /* 5. Sauvegarde locale */
   var timer;
   function save() {
@@ -432,7 +473,8 @@
       var data = { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }),
         m: emos.map(function (el) { return el.textContent; }),
         p: notes.map(function (n) { return { x: n.offsetLeft, y: n.offsetTop, t: n.querySelector(".pi-t").innerHTML }; }),
-        ph: photo };
+        ph: photo,
+        j: jals.map(function (j) { return { x: parseFloat(j.style.left), l: j.querySelector(".jal-l").innerHTML, d: j.querySelector(".jal-d").innerHTML }; }) };
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
     }, 300);
   }
@@ -444,6 +486,7 @@
       if (saved.c && saved.c.length === checks.length) checks.forEach(function (el, i) { setCheck(el, !!saved.c[i]); });
       if (saved.m && saved.m.length === emos.length) emos.forEach(function (el, i) { setEmo(el, saved.m[i]); });
       if (NOTES && saved.p) saved.p.forEach(function (d) { addNote(d); });
+      if (saved.j && jalLine) saved.j.forEach(function (d) { addJal(d); });
       if (saved.ph && photoEl) { photo = saved.ph; if (photo.type === "av") loadAv(renderPhoto); else renderPhoto(); }
     } catch (err) { /* rien à restaurer */ }
   }
