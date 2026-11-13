@@ -201,7 +201,8 @@
     // Frise (largeur 75 %) : l'espace libre à droite sert aux livrables
     var tl = z.querySelector(':scope > div[style*="width:75%"]');
     if (tl) { var side = mk("div", "ed-side"); z.appendChild(side); markBlock(side); }
-    if (!tl && !zoneHasField(z) && !zoneText(z)) { var lo = mk("div", "lo"); z.appendChild(lo); }
+    // Matrice Impact/effort : on y pose des post-its, pas de zone d'écriture
+    if (!tl && !zoneHasField(z) && !zoneText(z) && !/matrice-impact-effort/.test(location.pathname)) { var lo = mk("div", "lo"); z.appendChild(lo); }
   });
   var SMALL = ".fld i, .ft .d i, u, .ini i";
   root.querySelectorAll("*").forEach(function (el) {
@@ -357,18 +358,23 @@
   /* 6. Barre d'outils */
   var slug = location.pathname.split("/").pop().replace(/\.html$/, "") || "fiche";
   var bar = mk("div", "tb");
-  bar.innerHTML = (NOTES ? '<button type="button" data-a="note">Ajouter un post-it</button>' : '') +
-    '<button type="button" data-a="png">Enregistrer en image</button>' +
+  bar.innerHTML = '<button type="button" data-a="png">Enregistrer en image</button>' +
     '<button type="button" data-a="print">Imprimer / PDF</button>' +
     '<button type="button" data-a="clear">Tout effacer</button>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
   document.body.insertBefore(bar, document.body.firstChild);
   var msg = bar.querySelector(".msg");
+  // Bouton post-it : sous la fiche, à part des autres
+  if (NOTES) {
+    var below = mk("div", "tb-below"), nb = mk("button", "btn-note");
+    nb.type = "button"; nb.textContent = "+ Ajouter un post-it";
+    nb.addEventListener("click", function () { var n = addNote(); n.querySelector(".pi-t").focus(); save(); });
+    below.appendChild(nb); root.parentNode.insertBefore(below, root.nextSibling);
+  }
   bar.addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
     var a = b.getAttribute("data-a");
-    if (a === "note") { var n = addNote(); n.querySelector(".pi-t").focus(); save(); }
-    else if (a === "print") window.print();
+    if (a === "print") window.print();
     else if (a === "clear") {
       if (!confirm("Effacer tout ce qui a été saisi sur cette fiche ?")) return;
       try { localStorage.removeItem(KEY); } catch (err) {}
