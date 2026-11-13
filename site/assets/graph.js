@@ -372,7 +372,7 @@ function init(G) {
     if (id) { const n = byId.get(id);
       if (!state.types.has(n.type)) { state.types.add(n.type); if (chips) [...chips.children][typeKeys.indexOf(n.type)].classList.remove("off"); }
       if (n.deg === 0 && !state.showIso && !(state.showSug && n.sug.size)) isoBtn.click(); else update();
-      if (FULL) { setCollapsed(false); loadFiche(id); }
+      if (FULL) { setCollapsed(state.ring && MOB()); loadFiche(id); }
       const v = viewArea();
       if (state.ring) {
         const box = buildRing(n);
@@ -387,7 +387,7 @@ function init(G) {
     labelVis(d3.zoomTransform(svg.node()).k);
     if (bigLink) bigLink.href = BIG + (id ? "#" + id : "");
     if (FULL) {
-      renderPanel();
+      isoSync(); renderPanel();
       if (history.replaceState) history.replaceState(null, "", id ? "#" + id : location.pathname + location.search);
     }
   }
@@ -461,7 +461,13 @@ function init(G) {
   const wTitle = FULL && win.querySelector(".wt"), wSw = FULL && win.querySelector(".sw"), wBody = FULL && win.querySelector(".wbody");
   const wCol = FULL && win.querySelector("[data-collapse]");
   const ficheCache = new Map(); let ficheReq = null, shown = null;
-  function setCollapsed(c) { if (!FULL) return; win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); const l = c ? "Déplier la fiche" : "Replier la fiche"; wCol.setAttribute("aria-label", l); wCol.title = l; wCol.textContent = c ? (MOB() ? "▴" : "▸") : "▾";
+  // Bouton « Isoler » (mobile) : même effet que le double clic sur desktop
+  const wIso = FULL && win.querySelector("[data-iso]");
+  function isoSync() { if (!wIso) return; const on = !!state.ring;
+    wIso.hidden = !state.focus || /^(person|res):/.test(shown || "");
+    wIso.textContent = on ? "Tout voir" : "Isoler"; wIso.setAttribute("aria-pressed", on);
+    wIso.title = on ? "Revenir à la carte complète" : "Isoler la fiche avec ses liens"; }
+  function setCollapsed(c) { if (!FULL) return; isoSync(); win.classList.toggle("collapsed", c); wCol.setAttribute("aria-expanded", !c); const l = c ? "Déplier la fiche" : "Replier la fiche"; wCol.setAttribute("aria-label", l); wCol.title = l; wCol.textContent = c ? (MOB() ? "▴" : "▸") : "▾";
     // Une fiche dépliée ne doit pas dépasser du bas de l'écran
     if (!c && innerWidth > 760) requestAnimationFrame(() => { const r = win.getBoundingClientRect(); if (r.bottom > innerHeight - 8) win.style.top = Math.max(8, innerHeight - 8 - r.height) + "px"; }); }
   function resetFiche() {
@@ -589,6 +595,7 @@ function init(G) {
     const fp = store.get("reseau-fiche-pos");
     if (fp && innerWidth > 760) { win.style.left = Math.min(Math.max(0, fp.x), innerWidth - 120) + "px"; win.style.top = Math.min(Math.max(0, fp.y), innerHeight - 44) + "px"; }
     draggable(win, "reseau-fiche-pos");
+    wIso.onclick = e => { e.stopPropagation(); if (state.focus) select(state.focus, false, !state.ring); };
     win.querySelector("[data-close]").onclick = e => { e.stopPropagation(); if (shown && /^(person|res):/.test(shown) && state.focus) { shown = null; loadFiche(state.focus); } else select(null); };
     swipe(win.querySelector(".whead"), d => { if (MOB()) setCollapsed(d > 0); });
     swipe($("panel"), d => { if (MOB() && (d > 0) !== document.body.classList.contains("nopanel")) $("panelBtn").click(); }, ".grab");
