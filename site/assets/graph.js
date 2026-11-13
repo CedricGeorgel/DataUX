@@ -82,6 +82,22 @@ function init(G) {
   const HIDDEN = ["glossaire", "biblio"];
   const state = { ring: false, types: new Set(typeKeys.filter(t => !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null, panel: null };
   const color = n => TYPES[n.type].color;
+  // Une forme par base, en plus de la couleur (lisible sans la couleur). Les deux plus grosses bases restent rondes ou presque.
+  const SHAPE = { biais: "circle", glossaire: "square", kpi: "diamond", loi: "triangle", methode: "hexagon", framework: "pentagon", acteur: "tridown", biblio: "book" };
+  const shapeOf = t => SHAPE[t] || "circle";
+  const poly = (k, R, a0) => "M" + Array.from({ length: k }, (_, i) => { const a = (a0 + 360 * i / k) * Math.PI / 180; return (R * Math.cos(a)).toFixed(2) + "," + (R * Math.sin(a)).toFixed(2); }).join("L") + "Z";
+  function shapeD(s, r) {
+    if (s === "square") { const a = r * .88; return `M${-a},${-a}H${a}V${a}H${-a}Z`; }
+    if (s === "diamond") { const a = r * 1.2; return `M0,${-a}L${a},0L0,${a}L${-a},0Z`; }
+    if (s === "triangle") { const h = r * 1.15; return `M0,${-h}L${h * 1.05},${h * .8}L${-h * 1.05},${h * .8}Z`; }
+    if (s === "tridown") { const h = r * 1.15; return `M0,${h}L${h * 1.05},${-h * .8}L${-h * 1.05},${-h * .8}Z`; }
+    if (s === "hexagon") return poly(6, r * 1.07, 0);
+    if (s === "pentagon") return poly(5, r * 1.1, -90);
+    if (s === "book") { const w = r * .76, h = r * 1.04; return `M${-w},${-h}H${w}V${h}H${-w}Z`; }
+    return `M${-r},0A${r},${r} 0 1,0 ${r},0A${r},${r} 0 1,0 ${-r},0Z`;
+  }
+  // Tracé un peu réduit : le trait arrondi (même couleur) redonne la taille et adoucit les coins
+  const markD = d => shapeD(shapeOf(d.type), Math.max(2.2, rad(d) - 1.2));
   // Ressources (templates à imprimer) : hors carte, ouvertes depuis l'encart « Ressources »
   const RES = G.ressources || [], resById = new Map(RES.map(r => [r.id, r]));
 
@@ -122,7 +138,7 @@ function init(G) {
     typeKeys.forEach(t => {
       const b = document.createElement("button"); b.className = "chip" + (state.types.has(t) ? "" : " off"); b.setAttribute("aria-pressed", state.types.has(t));
       b.title = TYPES[t].label;
-      b.innerHTML = `<span class="sw" style="background:${TYPES[t].color}"></span><span class="full">${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span></span><span class="short">${esc(TYPES[t].label.replace(/^Fiches\s+/, "").split(" ")[0])}</span>`;
+      b.innerHTML = `<span class="sw" data-s="${shapeOf(t)}" style="background:${TYPES[t].color}"></span><span class="full">${esc(TYPES[t].label)} <span class="muted">${G.bases.find(x => x.key === t).count}</span></span><span class="short">${esc(TYPES[t].label.replace(/^Fiches\s+/, "").split(" ")[0])}</span>`;
       b.onclick = () => { state.types.has(t) ? state.types.delete(t) : state.types.add(t); b.classList.toggle("off", !state.types.has(t)); b.setAttribute("aria-pressed", state.types.has(t)); state.focus ? select(state.focus, false, state.ring) : update(); };
       chips.appendChild(b);
     });
@@ -260,7 +276,8 @@ function init(G) {
     nodeSel = gNodes.selectAll("g.node").data(visNodes, d => d.id).join(enter => {
       const g = enter.append("g").attr("class", "node").attr("tabindex", 0).attr("role", "button")
         .attr("aria-label", d => `${d.name}, ${TYPES[d.type].label}, ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
-      g.append("circle").attr("r", rad);
+      g.append("path").attr("class", "mk-o").attr("d", markD);
+      g.append("path").attr("class", "mk").attr("d", markD);
       g.append("text").attr("dy", d => -rad(d) - 4).attr("text-anchor", "middle").text(d => d.name);
       g.append("title").text(d => `${d.name} · ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
       g.on("click", (e, d) => { e.stopPropagation(); if (state.focus !== d.id || state.ring) select(d.id); })
@@ -303,7 +320,7 @@ function init(G) {
     placeLabels();
     return { R, H: maxH };
   }
-  function paint() { if (nodeSel) nodeSel.select("circle").attr("fill", color); }
+  function paint() { if (nodeSel) nodeSel.select(".mk").attr("fill", color).attr("stroke", color); }
 
   // ---------- Placement des noms sans chevauchement
   let curK = 1, raf = 0;
@@ -415,7 +432,7 @@ function init(G) {
 
   // ---------- Panneau (page complète)
   const panel = FULL ? $("panel") : null;
-  const item = (n, extra = "") => `<li><span class="sw" style="background:${color(n)}"></span><button class="lnk" data-id="${n.id}">${esc(n.name)}</button>${extra}</li>`;
+  const item = (n, extra = "") => `<li><span class="sw" data-s="${shapeOf(n.type)}" style="background:${color(n)}"></span><button class="lnk" data-id="${n.id}">${esc(n.name)}</button>${extra}</li>`;
   const grab = () => { const o = !document.body.classList.contains("nopanel");
     return `<button class="grab" aria-expanded="${o}" aria-label="${o ? "Réduire le panneau" : "Agrandir le panneau"}"><span></span></button>`; };
   const themeSwitch = () => { const d = isDark();
@@ -487,7 +504,7 @@ function init(G) {
   }
   async function loadFiche(id) {
     const n = byId.get(id); if (!n || shown === id) return; shown = id;
-    win.classList.remove("empty"); document.body.classList.add("hasfiche"); wTitle.textContent = n.name; wSw.style.background = color(n);
+    win.classList.remove("empty"); document.body.classList.add("hasfiche"); wTitle.textContent = n.name; wSw.style.background = color(n); wSw.dataset.s = shapeOf(n.type);
     if (ficheCache.has(id)) return renderFiche(ficheCache.get(id));
     wBody.innerHTML = `<div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div>`;
     wBody.setAttribute("aria-busy", "true");
@@ -541,7 +558,7 @@ function init(G) {
     const r = resById.get(rid); if (!r || !FULL) return;
     if (ficheReq) ficheReq.abort();
     shown = "res:" + rid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
-    wTitle.textContent = r.name; wSw.style.background = "var(--accent)";
+    wTitle.textContent = r.name; wSw.style.background = "var(--accent)"; delete wSw.dataset.s;
     const render = j => {
       wBody.removeAttribute("aria-busy");
       const props = j && j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
@@ -574,7 +591,7 @@ function init(G) {
     const p = peopleById.get(pid); if (!p || !FULL) return;
     if (ficheReq) ficheReq.abort();
     shown = "person:" + pid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
-    wTitle.textContent = p.name; wSw.style.background = "var(--text-muted)";
+    wTitle.textContent = p.name; wSw.style.background = "var(--text-muted)"; delete wSw.dataset.s;
     const fs = p.fiches.map(i => byId.get(i)).filter(Boolean)
       .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
     const ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
@@ -647,7 +664,7 @@ function init(G) {
     lb.innerHTML = `<ul class="leg">
         <li><span class="swl"></span>Lien logique</li>
         <li><span class="swl conf"></span>À ne pas confondre</li>
-        ${G.bases.map(b => `<li><span class="dot" style="background:${b.color}"></span>${esc(b.one || b.label)}</li>`).join("")}
+        ${G.bases.map(b => `<li><span class="dot" data-s="${shapeOf(b.key)}" style="background:${b.color}"></span>${esc(b.one || b.label)}</li>`).join("")}
       </ul>
       ${MOB() ? `<ul class="leg help"><li>Toucher : ouvrir la fiche.</li><li>Pincer pour voir plus de liens.</li></ul>`
         : `<ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Zoomer pour voir plus de liens, glisser pour déplacer.</li></ul>`}`;

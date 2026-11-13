@@ -56,7 +56,9 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);margin:0 4px 4px 0}
 .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .back{font-size:12px}
-.node circle{stroke:var(--paper);stroke-width:1.5}
+.node path{stroke-linejoin:round}
+.node .mk{stroke-width:2.4}
+.node .mk-o{fill:var(--paper);stroke:var(--paper);stroke-width:5.4}
 .node text{font-size:10.5px;fill:var(--ink);pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
 .node{cursor:pointer}
 .edge{stroke:var(--line-strong);stroke-opacity:.38}
@@ -76,7 +78,7 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .swl{display:inline-block;width:22px;height:0;border-top:1.5px solid var(--line-strong);vertical-align:middle;margin-right:6px}
 .swl.conf{border-top-color:var(--conf)}
 .dim{opacity:.08}
-.hl circle{stroke:var(--ink);stroke-width:2}
+.hl .mk-o{stroke:var(--ink);stroke-width:7}
 .legend{font-size:11px;color:var(--text-muted)}
 
 /* Chargement, erreurs, premier lancement */
@@ -171,7 +173,7 @@ ul.leg{list-style:none;margin:0;padding:0}
 ul.leg li{display:flex;align-items:center;gap:8px;padding:2px 0}
 ul.leg.help{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);color:var(--text-muted)}
 ul.leg .swl{margin:0;width:20px;flex:none;border-top-width:2px}
-ul.leg .dot{width:10px;height:10px;border-radius:50%;flex:none;margin:0 5px}
+ul.leg .dot{width:11px;height:11px;border-radius:50%;flex:none;margin:0 5px}
 
 /* Bouton Ressources : même allure que la légende, ouvre la liste dans le panneau */
 .res-btn{position:fixed;right:612px;bottom:12px;z-index:5;display:flex;align-items:center;gap:8px;width:230px;padding:9px 12px 9px 14px;
@@ -288,4 +290,31 @@ aside .btn:hover,.win .btn:hover,.bar:not(.inline) .pop .chip:hover{background:c
   .legend-win{width:var(--card-w)}
   .res-btn{width:var(--card-w);height:var(--card-h);padding:0 12px 0 14px;right:calc(372px + var(--card-w) + 10px)}
   body.nopanel .res-btn{right:calc(12px + var(--card-w) + 10px)}
+}
+
+/* Formes des bases sur les pastilles (même forme que les points de la carte) */
+.sw[data-s],.dot[data-s]{border-radius:0!important}
+.sw[data-s="circle"],.dot[data-s="circle"]{border-radius:50%!important}
+.sw[data-s="square"],.dot[data-s="square"]{border-radius:2.5px!important;transform:scale(.9)}
+.sw[data-s="diamond"],.dot[data-s="diamond"]{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transform:scale(1.1)}
+.sw[data-s="triangle"],.dot[data-s="triangle"]{clip-path:polygon(50% 4%,100% 92%,0 92%);transform:scale(1.1)}
+.sw[data-s="tridown"],.dot[data-s="tridown"]{clip-path:polygon(0 8%,100% 8%,50% 96%);transform:scale(1.1)}
+.sw[data-s="hexagon"],.dot[data-s="hexagon"]{clip-path:polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%);transform:scale(1.08)}
+.sw[data-s="pentagon"],.dot[data-s="pentagon"]{clip-path:polygon(50% 0,100% 38%,81% 98%,19% 98%,0 38%);transform:scale(1.08)}
+.sw[data-s="book"],.dot[data-s="book"]{clip-path:inset(0 17% round 1.5px)}
+
+/* Verre dépoli sur l'interface : la carte reste devinable sous les panneaux */
+:root{--glass:color-mix(in srgb,var(--paper) 64%,transparent);--glass-strong:color-mix(in srgb,var(--paper) 80%,transparent);
+ --glass-hi:rgba(255,255,255,.7);--glass-sh:0 8px 28px rgba(40,25,15,.12);--glass-blur:blur(18px) saturate(160%)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass-hi:rgba(255,255,255,.08);--glass-sh:0 10px 30px rgba(0,0,0,.45)}}
+[data-theme="dark"]{--glass-hi:rgba(255,255,255,.08);--glass-sh:0 10px 30px rgba(0,0,0,.45)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .bar input,.bar .btn,.bar.inline .chip,.pop,aside,.win,.res-btn{
+    background:var(--glass);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+    box-shadow:inset 0 0 0 1px var(--glass-hi),0 0 0 .5px color-mix(in srgb,var(--ink) 10%,transparent),var(--glass-sh)}
+  .win,.pop{background:var(--glass-strong)}
+  .chev{-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);clip-path:path("M29 0A9 9 0 0 1 20 9H9.5A9 9 0 0 0 .5 18V46A9 9 0 0 0 9.5 55H20A9 9 0 0 1 29 64Z")}
+  .chev .tab .fill{fill:var(--glass)}
+  .grab{background:none}
+  .tag,.bar:not(.inline) .pop .chip,aside .btn,.win .btn{background:color-mix(in srgb,var(--surface) 70%,transparent)}
 }
