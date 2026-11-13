@@ -23,6 +23,76 @@
     return m && m.length >= 3 && !(m[0] == 255 && m[1] == 255 && m[2] == 255) && (m.length < 4 || +m[3] > 0);
   }
 
+  /* 0. Calculs automatiques (ICE, RICE, Kano) : repérer les colonnes et verrouiller les cases calculées */
+  var calc = null;
+  function txt(el) { return (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+  root.querySelectorAll("table").forEach(function (t) {
+    if (calc || t.closest(".sq")) return;
+    var head = t.querySelector("thead tr"); if (!head) return;
+    var cols = Array.prototype.map.call(head.children, txt);
+    function col(word) { for (var i = 0; i < cols.length; i++) if (cols[i].indexOf(word) === 0) return i; return -1; }
+    var rows = Array.prototype.slice.call(t.querySelectorAll("tbody tr"));
+    var c;
+    if (col("reach") >= 0 && col("effort") >= 0) c = { kind: "rice", r: col("reach"), i: col("impact"), c: col("confidence"), e: col("effort"), s: col("score"), k: col("rang") };
+    else if (col("impact") >= 0 && col("facilité") >= 0) c = { kind: "ice", i: col("impact"), c: col("confiance"), f: col("facilité"), s: col("score"), k: col("rang") };
+    else if (col("si elle était présente") >= 0 && col("résultat") >= 0) c = { kind: "kano", p: col("si elle était présente"), a: col("si elle était absente"), s: col("résultat") };
+    if (!c) return;
+    c.rows = rows;
+    rows.forEach(function (tr) {
+      [c.s, c.k].forEach(function (i) { var td = tr.children[i]; if (i >= 0 && td) { td.setAttribute("data-calc", ""); td.classList.add("calc"); } });
+    });
+    calc = c;
+  });
+  function num(el) {
+    var e = el && el.querySelector("[data-ed]"); if (!e) return null;
+    var s = e.textContent.replace(/\s| /g, "");
+    if (s === "") return null;
+    var pct = /%$/.test(s); s = s.replace(/%$/, "").replace(",", ".");
+    var n = /^-?\d*\.?\d+$/.test(s) ? parseFloat(s) : NaN;
+    return { n: n, pct: pct, el: e };
+  }
+  function bad(v, ok) { if (!v) return; v.el.classList.toggle("bad", !ok); }
+  function fr(n) { return (n >= 100 ? Math.round(n) : Math.round(n * 10) / 10).toString().replace(".", ","); }
+  function put(td, value) { if (!td) return; var s = td.querySelector(".calc-v"); if (!s) { s = mk("span", "calc-v"); td.innerHTML = ""; td.appendChild(s); } s.textContent = value; }
+  var KANO = { M: "Obligatoire", O: "Performance", A: "Attractive", I: "Indifférente", R: "Rejetée", Q: "Douteuse" };
+  function recalc() {
+    if (!calc) return;
+    var scores = [];
+    calc.rows.forEach(function (tr, ri) {
+      var td = tr.children, score = null;
+      if (calc.kind === "ice") {
+        var vi = num(td[calc.i]), vc = num(td[calc.c]), vf = num(td[calc.f]);
+        [vi, vc, vf].forEach(function (v) { bad(v, v && v.n >= 1 && v.n <= 10); });
+        if ([vi, vc, vf].every(function (v) { return v && v.n >= 1 && v.n <= 10; })) score = vi.n * vc.n * vf.n;
+      } else if (calc.kind === "rice") {
+        var r = num(td[calc.r]), im = num(td[calc.i]), co = num(td[calc.c]), ef = num(td[calc.e]);
+        var cv = co ? (co.pct || co.n > 1 ? co.n / 100 : co.n) : null;
+        bad(r, r && r.n >= 0); bad(im, im && im.n > 0 && im.n <= 3); bad(co, co && cv > 0 && cv <= 1); bad(ef, ef && ef.n > 0);
+        if (r && im && co && ef && r.n >= 0 && im.n > 0 && im.n <= 3 && cv > 0 && cv <= 1 && ef.n > 0) score = r.n * im.n * cv / ef.n;
+      } else if (calc.kind === "kano") {
+        var pick = function (cell) {
+          var on = cell ? Array.prototype.slice.call(cell.querySelectorAll("[data-ck]")) : [];
+          for (var i = 0; i < on.length; i++) if (on[i].getAttribute("aria-checked") === "true") return i;
+          return -1;
+        };
+        var p = pick(td[calc.p]), a = pick(td[calc.a]), out = "";
+        var grid = root.querySelector(".sq tbody");
+        if (p >= 0 && a >= 0 && grid && grid.rows[p] && grid.rows[p].cells[a + 1]) {
+          var l = grid.rows[p].cells[a + 1].textContent.trim();
+          out = l + (KANO[l] ? " · " + KANO[l] : "");
+        }
+        put(td[calc.s], out);
+        return;
+      }
+      scores.push({ ri: ri, s: score });
+      put(td[calc.s], score === null ? "" : fr(score));
+    });
+    if (calc.k >= 0) scores.forEach(function (x) {
+      var rank = x.s === null ? "" : 1 + scores.filter(function (y) { return y.s !== null && y.s > x.s; }).length;
+      put(calc.rows[x.ri].children[calc.k], String(rank));
+    });
+  }
+
   /* 1. Préparation : transformer les gabarits texte en champs */
 
   // a. Traits de soulignement « ____ » : l'élément entier ou chaque série devient un champ
@@ -89,7 +159,13 @@
   });
   function addCheck(el, kind) {
     el.setAttribute("data-ck", kind); el.setAttribute("role", "checkbox"); el.setAttribute("tabindex", "0"); el.setAttribute("aria-checked", "false");
-    function toggle() { setCheck(el, el.getAttribute("aria-checked") !== "true"); save(); }
+    function toggle() {
+      var on = el.getAttribute("aria-checked") !== "true";
+      // Kano : une seule réponse par question
+      var grp = calc && calc.kind === "kano" && el.closest(".cbl");
+      if (on && grp) grp.querySelectorAll("[data-ck]").forEach(function (o) { if (o !== el) setCheck(o, false); });
+      setCheck(el, on); save();
+    }
     el.addEventListener("click", toggle);
     el.addEventListener("keydown", function (e) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(); } });
     checks.push(el);
@@ -119,7 +195,7 @@
   });
   var SMALL = ".fld i, .ft .d i, u, .ini i";
   root.querySelectorAll("*").forEach(function (el) {
-    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck]")) return;
+    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc]")) return;
     if (el.matches(SMALL)) { if (empty(el)) markLine(el); return; }
     var ok = false;
     if (el.matches(".bx, .card.d, .card, .lo")) ok = !el.querySelector("[data-ck]") && (el.matches(".bx, .card.d, .lo") || empty(el));
@@ -179,11 +255,13 @@
       eds.push(w);
     });
     restore();
+    recalc();
   });
 
   /* 5. Sauvegarde locale */
   var timer;
   function save() {
+    recalc();
     clearTimeout(timer);
     timer = setTimeout(function () {
       var data = { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }) };

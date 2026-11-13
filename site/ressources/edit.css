@@ -33,6 +33,10 @@ td>.ed,th>.ed{vertical-align:top}
 i[data-ck].on{background:#141414;box-shadow:inset 0 0 0 2px #fff}
 .pill[data-ck].on{background:var(--ink,#141414);color:var(--paper,#fff);border-color:var(--ink,#141414)}
 
+/* Calculs automatiques (écran) : cases verrouillées sur fond beige, valeur hors limites en rouge */
+td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-left:3px!important;padding-right:3px!important}
+.calc-v{display:block;color:var(--ink,#141414);font-size:10px;text-align:center;line-height:1.2;white-space:nowrap;overflow:hidden}
+.ed.bad{color:#c0392b}
 .capturing .ed:focus{background:none;box-shadow:none}
 @media print{.tb{display:none}.ed:focus{background:none;box-shadow:none}}
 @media (max-width:760px){.tb{font-size:12px}}
