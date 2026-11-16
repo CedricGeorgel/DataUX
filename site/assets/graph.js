@@ -202,11 +202,15 @@ function init(G) {
   const wSorted = [...wRaw.values()].sort((x, y) => x - y), wQ = wSorted[Math.floor(wSorted.length * .9)] || 1;
   const wLink = new Map([...wRaw].map(([k, w]) => [k, .06 + Math.min(1, w / wQ)]));
   const wMean = d3.mean([...wLink.values()]) || 1;
+  let linkCap = Infinity;
   function linlog() {
     const f = alpha => sim.force("link").links().forEach(l => { if (l.sug) return;
       const s = l.source, t = l.target, dx = t.x - s.x, dy = t.y - s.y, d = Math.hypot(dx, dy) || 1e-3;
       const F = 17.6 * (wLink.get(eKey(s.id, t.id)) || wMean) / wMean * Math.log(1 + d) * alpha / d;
-      s.vx += dx * F / (s.deg + 1); s.vy += dy * F / (s.deg + 1); t.vx -= dx * F / (t.deg + 1); t.vy -= dy * F / (t.deg + 1); });
+      // Après le calcul initial, pas plus de 5 % de la distance par étape (linkCap) : sinon 2 fiches peu liées
+      // se dépassent à chaque étape et un petit îlot tourbillonne sur lui-même après un filtre.
+      const ks = Math.min(F / (s.deg + 1), linkCap), kt = Math.min(F / (t.deg + 1), linkCap);
+      s.vx += dx * ks; s.vy += dy * ks; t.vx -= dx * kt; t.vy -= dy * kt; });
     f.initialize = () => {}; return f;
   }
   const sim = d3.forceSimulation().alphaDecay(.012)
@@ -641,6 +645,7 @@ function init(G) {
     const p = {}; G.nodes.forEach(n => { p[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10]; });
     store.set(LKEY, { sig: lsig, p }); }
   else G.nodes.forEach(n => { n.vx = 0; n.vy = 0; });
+  linkCap = .05;
   sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
   addEventListener("resize", () => { fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 0); });
