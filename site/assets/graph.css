@@ -66,10 +66,6 @@ ul.links li .sw{flex:none;width:8px;height:8px;border-radius:50%;transform:trans
 .edge{opacity:var(--f,1)}
 .edge.dim{opacity:calc(var(--f,1) * .12)}
 .edge.on{opacity:1}
-.hull path{fill:var(--ink);fill-opacity:.016;stroke:var(--line-strong);stroke-opacity:.3;stroke-dasharray:3 4}
-.hull text{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;fill:var(--text-muted);cursor:pointer;paint-order:stroke;stroke:var(--surface);stroke-width:4px}
-.hull text:hover{fill:var(--ink)}
-.hull.dim{opacity:.05}
 .edge.on{stroke:var(--ink);stroke-opacity:.75;stroke-width:1.4}
 .edge.sug{stroke:var(--conf);stroke-opacity:.26}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .edge.sug{stroke-opacity:.2}}

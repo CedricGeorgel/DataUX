@@ -177,7 +177,7 @@ function init(G) {
   // ---------- SVG
   const svg = d3.select("#svg"); svg.selectAll("*").remove();
   const root = svg.append("g");
-  const gHulls = root.append("g"), gEdges = root.append("g"), gNodes = root.append("g");
+  const gEdges = root.append("g"), gNodes = root.append("g");
   const zoom = d3.zoom().scaleExtent([.15, 5]).on("zoom", e => { root.attr("transform", e.transform); labelVis(e.transform.k); edgeVis(e.transform.k); });
   svg.call(zoom).on("dblclick.zoom", null);
   svg.on("click", e => { if (e.target === svg.node()) select(null); });
@@ -185,62 +185,6 @@ function init(G) {
   // ---------- Disposition par groupes (Louvain calculé par le serveur)
   const C = G.comms;
   const sameComm = (a, b) => { a = a.id ? a : byId.get(a); b = b.id ? b : byId.get(b); return a.comm === b.comm && a.comm >= 0; };
-  function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy; let u = L ? ((px - ax) * dx + (py - ay) * dy) / L : 0;
-    u = Math.max(0, Math.min(1, u)); const qx = ax + u * dx, qy = ay + u * dy; return { d: Math.hypot(px - qx, py - qy), u, qx, qy }; }
-  // Une bulle par groupe. On essaie plusieurs dispositions et on garde celle où le moins de liens
-  // entre 2 bulles traversent une 3e bulle, puis la plus compacte. Tirages fixes : même vue à chaque ouverture.
-  function anchors() {
-    const w = {};
-    G.edges.forEach(([a, b]) => { const ca = byId.get(a).comm, cb = byId.get(b).comm;
-      if (ca !== cb && ca >= 0 && cb >= 0) { const key = Math.min(ca, cb) + "-" + Math.max(ca, cb); w[key] = (w[key] || 0) + 1; } });
-    const pairs = Object.entries(w).map(([k, v]) => { const [s, t] = k.split("-").map(Number); return { s, t, w: v }; });
-    function edgeAvoid(nodes, links, margin) { let alpha = 0;
-      const f = a => { alpha = a; links.forEach(l => { const S = l.source, T = l.target;
-        nodes.forEach(c => { if (c === S || c === T) return; const r = segDist(c.x, c.y, S.x, S.y, T.x, T.y);
-          const need = c.r + margin; if (r.u > 0.02 && r.u < 0.98 && r.d < need) { const nx = (c.x - r.qx) || 1e-3, ny = (c.y - r.qy) || 1e-3, n = Math.hypot(nx, ny);
-            const push = (need - r.d) * alpha * 0.6; c.vx += nx / n * push; c.vy += ny / n * push; S.vx -= nx / n * push * .25; S.vy -= ny / n * push * .25; T.vx -= nx / n * push * .25; T.vy -= ny / n * push * .25; } }); }); };
-      f.initialize = () => {}; return f; }
-    function run(seed) {
-      const rnd = d3.randomLcg(seed);
-      const sup = C.map((c, k) => ({ c, k })).filter(o => !o.c.small).map(({ c, k }) => { const a = rnd() * 6.283, d = 150 + rnd() * 350; return { k, r: 15 * Math.sqrt(c.size) + 16, x: Math.cos(a) * d, y: Math.sin(a) * d }; });
-      const sl = pairs.filter(p => !C[p.s].small && !C[p.t].small).map(p => ({ source: p.s, target: p.t, w: p.w }));
-      const ss = d3.forceSimulation(sup).stop().randomSource(d3.randomLcg(seed + 1))
-        .force("link", d3.forceLink(sl).id(d => d.k).distance(l => l.source.r + l.target.r + 60).strength(l => Math.min(.8, .12 * l.w)))
-        .force("charge", d3.forceManyBody().strength(d => -25 * d.r))
-        .force("collide", d3.forceCollide(d => d.r + 40))
-        .force("avoid", edgeAvoid(sup, sl, 22))
-        .force("x", d3.forceX(0).strength(.05)).force("y", d3.forceY(0).strength(.05));
-      for (let i = 0; i < 700; i++) ss.tick();
-      let cross = 0;
-      sl.forEach(l => sup.forEach(c => { if (c === l.source || c === l.target) return;
-        const r = segDist(c.x, c.y, l.source.x, l.source.y, l.target.x, l.target.y); if (r.u > 0 && r.u < 1 && r.d < c.r + 8) cross += l.w; }));
-      const cx = d3.mean(sup, s => s.x) || 0, cy = d3.mean(sup, s => s.y) || 0;
-      const R = d3.max(sup, s => Math.hypot(s.x - cx, s.y - cy) + s.r) || 0;
-      return { sup, cross, R, score: cross * 300 + R };
-    }
-    const runs = C.filter(c => !c.small).length > 2 ? 60 : 1;
-    let best = null; for (let seed = 1; seed <= runs; seed++) { const r = run(seed); if (!best || r.score < best.score) best = r; }
-    const sup = best.sup, a = {}; sup.forEach(s => a[s.k] = [s.x, s.y]);
-    if (!sup.length) sup.push({ k: -1, r: 60, x: 0, y: 0 });
-    // fiches isolées : couronne irrégulière qui suit la forme de l'ensemble, groupées par base
-    const rnd = d3.randomLcg(7);
-    // une fiche isolée qui a une confusion avec une fiche d'un groupe se place juste à l'extérieur de ce groupe
-    const gx = d3.mean(sup, s => s.x), gy = d3.mean(sup, s => s.y), near = new Map();
-    G.nodes.filter(n => n.comm < 0).forEach(n => { const p = [...n.sug].map(i => byId.get(i)).find(m => m.comm >= 0 && a[m.comm]); if (!p) return;
-      const s = sup.find(o => o.k === p.comm), k = near.get(p.comm) || 0; near.set(p.comm, k + 1);
-      const t = Math.atan2(s.y - gy, s.x - gx) + (k - .5) * .35; n.iso = [s.x + (s.r + 55) * Math.cos(t), s.y + (s.r + 55) * Math.sin(t)]; n.nearComm = true; });
-    const iso = G.nodes.filter(n => n.comm < 0 && !n.nearComm).sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
-    // les îlots de 2 fiches rejoignent la couronne, répartis entre les fiches isolées
-    const smalls = C.map((c, k) => ({ c, k })).filter(o => o.c.small).map(o => ({ small: o.k }));
-    const crown = iso.slice(); smalls.forEach((o, i) => crown.splice(Math.round((i + .5) * crown.length / smalls.length) + i, 0, o));
-    const x0 = d3.min(sup, s => s.x - s.r), x1 = d3.max(sup, s => s.x + s.r), y0 = d3.min(sup, s => s.y - s.r), y1 = d3.max(sup, s => s.y + s.r);
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2 + 90, ry = (y1 - y0) / 2 + 90, ph = rnd() * 6.28;
-    crown.forEach((n, i) => { const t = -Math.PI / 2 + (i + (rnd() - .5) * .8) * 2 * Math.PI / crown.length;
-      const wob = 1 + .07 * Math.sin(3 * t + ph) + .05 * Math.sin(5 * t + 2 * ph), off = (rnd() - .3) * 70;
-      const p = [cx + (rx * wob + off) * Math.cos(t), cy + (ry * wob + off) * Math.sin(t)];
-      if (n.small !== undefined) a[n.small] = p; else n.iso = p; });
-    return a;
-  }
   // Disposition gardée dans le navigateur : tant que les fiches, les liens et le code ne changent pas,
   // on réutilise les positions calculées à la visite précédente (le calcul prend près d'une seconde).
   const LKEY = "reseau-layout", VER = (/\?v=(\w+)/.exec([...document.scripts].map(x => x.src).join(" ")) || [])[1] || "";
@@ -248,20 +192,16 @@ function init(G) {
     let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + str.length; })();
   let cached = store.get(LKEY); if (!cached || cached.sig !== lsig || !cached.p) cached = null;
   if (cached && !G.nodes.every(n => cached.p[n.id])) cached = null;
-  const A = cached ? cached.A : anchors();
-  if (cached) G.nodes.forEach(n => { const c = cached.p[n.id]; if (c[2]) n.iso = c[2]; if (c[3]) n.nearComm = true; });
-  const ax = d => d.comm < 0 ? d.iso[0] : A[d.comm][0], ay = d => d.comm < 0 ? d.iso[1] : A[d.comm][1];
   const rad = n => 4 + Math.sqrt(n.deg) * 2.6;
   const sim = d3.forceSimulation().alphaDecay(.025)
     .force("link", d3.forceLink().id(d => d.id)
-      .distance(l => l.sug ? 140 : sameComm(l.source, l.target) ? 40 : 160)
-      .strength(l => l.sug ? 0 : sameComm(l.source, l.target) ? .5 : .02))
-    .force("charge", d3.forceManyBody().strength(-60).distanceMax(170))
-    .force("x", d3.forceX(ax).strength(d => d.comm < 0 ? .06 : .13))
-    .force("y", d3.forceY(ay).strength(d => d.comm < 0 ? .06 : .13))
+      .distance(l => l.sug ? 140 : 50).strength(l => l.sug ? 0 : .4))
+    .force("charge", d3.forceManyBody().strength(-90).distanceMax(400))
+    .force("x", d3.forceX(0).strength(.04))
+    .force("y", d3.forceY(0).strength(.04))
     .force("collide", d3.forceCollide(d => rad(d) + 5));
   const rndN = d3.randomLcg(3); sim.randomSource(d3.randomLcg(5));
-  G.nodes.forEach(n => { n.x = ax(n) + (rndN() - .5) * 40; n.y = ay(n) + (rndN() - .5) * 40; });
+  G.nodes.forEach(n => { n.x = (rndN() - .5) * 800; n.y = (rndN() - .5) * 800; });
   if (cached) G.nodes.forEach(n => { n.x = cached.p[n.id][0]; n.y = cached.p[n.id][1]; });
 
   let nodeSel, edgeSel, visNodes = [], visEdges = [];
@@ -357,22 +297,8 @@ function init(G) {
   sim.on("tick", () => {
     edgeSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
     nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
-    drawHulls(); scheduleLabels();
+    scheduleLabels();
   });
-  const hullLine = d3.line().curve(d3.curveCatmullRomClosed.alpha(.5));
-  function drawHulls() {
-    const groups = d3.group(visNodes.filter(n => n.comm >= 0 && !C[n.comm].small), n => n.comm);
-    const data = [...groups].filter(([, ns]) => ns.length >= 3).map(([k, ns]) => {
-      const pts = []; ns.forEach(n => { const r = rad(n) + 16; for (let a = 0; a < 6.28; a += 0.785) pts.push([n.x + r * Math.cos(a), n.y + r * Math.sin(a)]); });
-      const h = d3.polygonHull(pts); return { k, h, top: d3.min(h, p => p[1]), cx: d3.mean(ns, n => n.x) };
-    });
-    const sel = gHulls.selectAll("g.hull").data(data, d => d.k).join(enter => {
-      const g = enter.append("g").attr("class", "hull");
-      g.append("path");
-      return g; });
-    sel.select("path").attr("d", d => hullLine(d.h));
-    sel.classed("dim", !!state.focus);
-  }
   function fitNodes(ns, maxK = 1.4, dur = 600) {
     if (!ns.length) return;
     const v = viewArea();
@@ -696,8 +622,8 @@ function init(G) {
   if (document.fonts) document.fonts.ready.then(() => fitBar());
   sim.stop();
   if (!cached) { for (let i = 0; i < 350; i++) sim.tick();
-    const p = {}; G.nodes.forEach(n => { p[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10, n.iso || 0, n.nearComm ? 1 : 0]; });
-    store.set(LKEY, { sig: lsig, A, p }); }
+    const p = {}; G.nodes.forEach(n => { p[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10]; });
+    store.set(LKEY, { sig: lsig, p }); }
   else G.nodes.forEach(n => { n.vx = 0; n.vy = 0; });
   sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
