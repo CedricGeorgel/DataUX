@@ -193,12 +193,28 @@ function init(G) {
   let cached = store.get(LKEY); if (!cached || cached.sig !== lsig || !cached.p) cached = null;
   if (cached && !G.nodes.every(n => cached.p[n.id])) cached = null;
   const rad = n => 4 + Math.sqrt(n.deg) * 2.6;
-  const sim = d3.forceSimulation().alphaDecay(.025)
-    .force("link", d3.forceLink().id(d => d.id)
-      .distance(l => l.sug ? 140 : 50).strength(l => l.sug ? 0 : .4))
-    .force("charge", d3.forceManyBody().strength(-90).distanceMax(400))
-    .force("x", d3.forceX(0).strength(.04))
-    .force("y", d3.forceY(0).strength(.04))
+  // Disposition « LinLog » (modèle de Gephi) avec des liens pondérés : aucun groupe n'est imposé.
+  // Un lien tire d'autant plus fort que ses deux fiches partagent de voisins (cosinus, normalisé),
+  // l'attraction croît en log de la distance, et les fiches très liées repoussent davantage
+  // et bougent moins : elles se placent entre leurs groupes au lieu de tout aspirer au centre.
+  const wRaw = new Map(G.edges.map(([a, b]) => { const A = byId.get(a), B = byId.get(b); let s = 0;
+    A.nb.forEach(x => { if (B.nb.has(x)) s++; }); return [eKey(a, b), s / Math.sqrt(A.deg * B.deg)]; }));
+  const wSorted = [...wRaw.values()].sort((x, y) => x - y), wQ = wSorted[Math.floor(wSorted.length * .9)] || 1;
+  const wLink = new Map([...wRaw].map(([k, w]) => [k, .06 + Math.min(1, w / wQ)]));
+  const wMean = d3.mean([...wLink.values()]) || 1;
+  function linlog() {
+    const f = alpha => sim.force("link").links().forEach(l => { if (l.sug) return;
+      const s = l.source, t = l.target, dx = t.x - s.x, dy = t.y - s.y, d = Math.hypot(dx, dy) || 1e-3;
+      const F = 17.6 * (wLink.get(eKey(s.id, t.id)) || wMean) / wMean * Math.log(1 + d) * alpha / d;
+      s.vx += dx * F / (s.deg + 1); s.vy += dy * F / (s.deg + 1); t.vx -= dx * F / (t.deg + 1); t.vy -= dy * F / (t.deg + 1); });
+    f.initialize = () => {}; return f;
+  }
+  const sim = d3.forceSimulation().alphaDecay(.012)
+    .force("link", d3.forceLink().id(d => d.id).strength(0))
+    .force("linlog", linlog())
+    .force("charge", d3.forceManyBody().strength(d => -9 * (d.deg + 1)))
+    .force("x", d3.forceX(0).strength(.012))
+    .force("y", d3.forceY(0).strength(.012))
     .force("collide", d3.forceCollide(d => rad(d) + 5));
   const rndN = d3.randomLcg(3); sim.randomSource(d3.randomLcg(5));
   G.nodes.forEach(n => { n.x = (rndN() - .5) * 800; n.y = (rndN() - .5) * 800; });
@@ -621,7 +637,7 @@ function init(G) {
   update(); renderPanel(); fitBar();
   if (document.fonts) document.fonts.ready.then(() => fitBar());
   sim.stop();
-  if (!cached) { for (let i = 0; i < 350; i++) sim.tick();
+  if (!cached) { for (let i = 0; i < 450; i++) sim.tick();
     const p = {}; G.nodes.forEach(n => { p[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10]; });
     store.set(LKEY, { sig: lsig, p }); }
   else G.nodes.forEach(n => { n.vx = 0; n.vy = 0; });
