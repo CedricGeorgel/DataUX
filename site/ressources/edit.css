@@ -17,6 +17,9 @@ td>.ed,th>.ed{vertical-align:top}
 [data-line]{min-width:0;overflow:hidden;contain:inline-size}
 [data-box]>.ed{contain:inline-size}
 .ed-under{display:inline-block;vertical-align:baseline;border-bottom:1px solid var(--line-strong,#8f867e);min-height:12px}
+/* Pas d'overflow:hidden ici : il placerait la ligne de base en bas du cadre et le texte flotterait au-dessus du trait. clip-path coupe le débordement sans toucher à l'alignement. */
+.ed-under,.ed-under>.ed{overflow:visible;clip-path:inset(-6px 0 -6px 0)}
+.ed-under>.ed{padding-left:2px}
 .ed-row{display:flex;align-items:baseline;gap:4px}
 .ed-grow{flex:1}
 .ed-line-block{border-bottom:1px solid var(--line-strong,#8f867e);min-height:14px;width:90%;align-self:center}
