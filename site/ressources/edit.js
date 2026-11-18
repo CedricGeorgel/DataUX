@@ -43,6 +43,25 @@
     });
     calc = c;
   });
+  // SUS : points de chaque ligne, sous-totaux et score sur 100 calculés depuis les ronds cochés
+  var sus = /questionnaire-sus/.test(location.pathname) ? Array.prototype.slice.call(root.querySelectorAll(".big tbody tr")) : null;
+  if (sus) {
+    sus.forEach(function (tr) { var td = tr.children[3]; if (td) { td.setAttribute("data-calc", ""); td.classList.add("calc"); } });
+    root.querySelectorAll(".cl i, .big-score i").forEach(function (i) { i.setAttribute("data-calc", ""); });
+  }
+  function recalcSus() {
+    var odd = 0, even = 0, all = true;
+    sus.forEach(function (tr, ri) {
+      var dots = Array.prototype.slice.call(tr.querySelectorAll(".o > i")), k = -1;
+      dots.forEach(function (d, i) { if (d.getAttribute("aria-checked") === "true") k = i; });
+      var pts = k < 0 ? null : (ri % 2 === 0 ? k : 4 - k);
+      if (pts === null) all = false; else if (ri % 2 === 0) odd += pts; else even += pts;
+      put(tr.children[3], pts === null ? "" : String(pts));
+    });
+    var boxes = root.querySelectorAll(".cl i, .big-score i");
+    var vals = all ? [odd, even, odd + even, fr((odd + even) * 2.5)] : ["", "", "", ""];
+    Array.prototype.forEach.call(boxes, function (b, i) { put(b, String(vals[i])); });
+  }
   function num(el) {
     var e = el && el.querySelector("[data-ed]"); if (!e) return null;
     var s = e.textContent.replace(/\s| /g, "");
@@ -56,6 +75,7 @@
   function put(td, value) { if (!td) return; var s = td.querySelector(".calc-v"); if (!s) { s = mk("span", "calc-v"); td.innerHTML = ""; td.appendChild(s); } s.textContent = value; }
   var KANO = { M: "Obligatoire", O: "Performance", A: "Attractive", I: "Indifférente", R: "Rejetée", Q: "Douteuse" };
   function recalc() {
+    if (sus) recalcSus();
     if (!calc) return;
     var scores = [];
     calc.rows.forEach(function (tr, ri) {
@@ -169,6 +189,9 @@
     var s = i.getAttribute("style") || "";
     if (/border-radius:\s*50%/.test(s) && /width:\s*11px/.test(s)) { addCheck(i, ""); i.setAttribute("data-radio", ""); }
   });
+  // Fiches 2027 : ronds d'échelle (un choix par ligne), cases à cocher, oui/non, garder/exclure, gommettes de vote
+  root.querySelectorAll(".os .o > i, .yn > i, .ge i").forEach(function (i) { addCheck(i, ""); i.setAttribute("data-radio", ""); });
+  root.querySelectorAll("i.box, .dotv > i").forEach(function (i) { addCheck(i, ""); });
   var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), texts = [];
   while (walker.nextNode()) if (/[☐○]/.test(walker.currentNode.nodeValue)) texts.push(walker.currentNode);
   texts.forEach(function (t) {
@@ -187,7 +210,7 @@
       var grp = calc && calc.kind === "kano" && el.closest(".cbl");
       if (on && grp) grp.querySelectorAll("[data-ck]").forEach(function (o) { if (o !== el) setCheck(o, false); });
       // Échelle à ronds (aisance numérique) : un seul choix
-      if (on && el.hasAttribute("data-radio")) el.parentElement.querySelectorAll("[data-radio]").forEach(function (o) { if (o !== el) setCheck(o, false); });
+      if (on && el.hasAttribute("data-radio")) (el.closest(".os, .yn, .ge") || el.parentElement).querySelectorAll("[data-radio]").forEach(function (o) { if (o !== el) setCheck(o, false); });
       setCheck(el, on); save();
     }
     el.addEventListener("click", toggle);
@@ -219,20 +242,26 @@
     // Matrice Impact/effort : on y pose des post-its, pas de zone d'écriture
     if (!tl && !zoneHasField(z) && !zoneText(z) && !/matrice-impact-effort/.test(location.pathname)) { var lo = mk("div", "lo"); z.appendChild(lo); }
   });
-  var SMALL = ".fld i, .ft .d i, u, .ini i";
+  var SMALL = ".fld i, .ft .d i, u, .ini i, .kv i, .tl i, .nl i, .pct, .hl2";
   root.querySelectorAll("*").forEach(function (el) {
-    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc]")) return;
+    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc], svg")) return;
     if (el.matches(SMALL)) { if (empty(el)) markLine(el); return; }
     var ok = false;
     if (el.matches(".bx, .card.d, .card, .lo")) ok = !el.querySelector("[data-ck]") && (el.matches(".bx, .card.d, .lo") || empty(el));
-    else if (leaf(el) && empty(el) && !el.matches(".n, i[style*='border-radius:50%'], i[style*='border-radius: 50%']")) {
+    else if (leaf(el) && empty(el) && (!el.matches(".n") || emptyFirstCol(el)) && !el.matches("i[style*='border-radius:50%'], i[style*='border-radius: 50%']")) {
       var r = el.getBoundingClientRect();
       ok = r.width >= 30 && r.height >= 14;
     }
-    if (ok && el.matches("td, th") && isLabelCell(el)) ok = false;
+    if (ok && el.matches("td, th") && isLabelCell(el) && !emptyFirstCol(el)) ok = false;
     if (ok) markBlock(el);
   });
 
+  // Première colonne beige vide sous un titre de colonne (Tâche, Écran, Idée, Personne…) : à remplir, pas un intitulé
+  function emptyFirstCol(td) {
+    if (!td.matches("td.n") || !empty(td) || td.cellIndex !== 0) return false;
+    var t = td.closest("table"), h = t && t.tHead && t.tHead.rows[0];
+    return !!(h && h.cells[0] && h.cells[0].textContent.replace(NB, "") !== "");
+  }
   function markLine(el) { el.setAttribute("data-line", ""); }
   function markBlock(el) { el.setAttribute("data-box", ""); }
 
@@ -330,14 +359,15 @@
     });
     });
   }
-  // Post-its : seulement sur la Matrice Impact/effort
-  var NOTES = /matrice-impact-effort/.test(location.pathname);
+  // Post-its : Matrice Impact/effort (idées) et Carte de l'écosystème (acteurs posés sur les cercles)
+  var ECO = /carte-de-l-ecosysteme/.test(location.pathname);
+  var NOTES = ECO || /matrice-impact-effort/.test(location.pathname);
   function addNote(d) {
     d = d || { x: 120 + notes.length * 14 % 140, y: 140 + notes.length * 14 % 140, t: "" };
     var n = mk("div", "pi"); n.style.left = d.x + "px"; n.style.top = d.y + "px";
     var grip = mk("div", "pi-grip"); grip.setAttribute("aria-hidden", "true");
     var del = mk("button", "pi-del"); del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label", "Supprimer ce post-it");
-    var t = mk("div", "pi-t"); t.setAttribute("contenteditable", "true"); t.setAttribute("data-ph", "Idée…"); t.className = "pi-t ed"; t.innerHTML = d.t || "";
+    var t = mk("div", "pi-t"); t.setAttribute("contenteditable", "true"); t.setAttribute("data-ph", ECO ? "Acteur…" : "Idée…"); t.className = "pi-t ed"; t.innerHTML = d.t || "";
     n.appendChild(grip); n.appendChild(del); n.appendChild(t); root.appendChild(n);
     del.addEventListener("click", function () { notes.splice(notes.indexOf(n), 1); n.remove(); save(); });
     t.addEventListener("input", save);
@@ -517,7 +547,7 @@
   // Bouton post-it : sous la fiche, à part des autres
   if (NOTES) {
     var below = mk("div", "tb-below"), nb = mk("button", "btn-note");
-    nb.type = "button"; nb.textContent = "+ Ajouter un post-it";
+    nb.type = "button"; nb.textContent = ECO ? "+ Ajouter un acteur" : "+ Ajouter un post-it";
     nb.addEventListener("click", function () { var n = addNote(); n.querySelector(".pi-t").focus(); save(); });
     below.appendChild(nb); root.parentNode.insertBefore(below, root.nextSibling);
   }
