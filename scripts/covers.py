@@ -18,6 +18,7 @@ CX, CY = W / 2, H / 2
 BASES = {
     "kpi": "#d9730d", "loi": "#337ea9", "biais": "#9065b0", "methode": "#448361",
     "framework": "#cb912f", "acteur": "#c14c8a", "glossaire": "#d44c47", "biblio": "#91918e", "ressource": "#9f6b53",
+    "metier": "#d44c47",
 }
 
 
@@ -530,6 +531,24 @@ def m_monogram(r, nom):
     return s
 
 
+def m_badge(r):
+    # des badges d'équipe suspendus à leur cordon : un métier qui se distingue parmi d'autres
+    s = []; n = r.choice([3, 4, 5]); hi = r.randrange(n); gap = 250
+    x0 = CX - (n - 1) * gap / 2
+    for i in range(n):
+        acc = i == hi; k = 1.2 if acc else 1; w, h = 170 * k, 220 * k
+        x = x0 + i * gap; y = CY - 15 + r.uniform(-20, 20) + (0 if acc else 20)
+        o = 1 if acc else .45
+        s.append(path(f"M{x - 60} -10 L{x} {y - h / 2 - 14} L{x + 60} -10", o * .8, acc=acc, w=3))
+        s += [rect(x - w / 2, y - h / 2, w, h, 18, o, acc=acc),
+              rect(x - 22, y - h / 2 - 14, 44, 28, 8, o, acc=acc),
+              ring(x, y - h * .14, 32 * k, o, acc=acc, w=4),
+              line(x - w * .3, y + h * .2, x + w * r.uniform(.05, .3), y + h * .2, o, acc=acc, w=6),
+              line(x - w * .3, y + h * .33, x + w * r.uniform(-.1, .15), y + h * .33, o * .7, acc=acc, w=5)]
+    s += [dot(CX - 600 + r.random() * 1200, CY + 200 + r.random() * 70, 5, .3) for _ in range(14)]
+    return s
+
+
 MOTIFS = {k[2:]: v for k, v in globals().items() if k.startswith("m_")}
 
 # ---------- choix du motif ----------
@@ -566,7 +585,7 @@ REGLES = [
 ]
 
 DEFAUT = {"kpi": "curve", "loi": "target", "biais": "noise", "methode": "journey", "framework": "canvas",
-          "acteur": "monogram", "glossaire": "stack", "biblio": "book", "ressource": "canvas"}
+          "acteur": "monogram", "glossaire": "stack", "biblio": "book", "ressource": "canvas", "metier": "badge"}
 
 
 def norm(s):
@@ -600,6 +619,8 @@ def choisir(f):
         return "monogram"
     if f["base"] == "biblio":
         return "book"
+    if f["base"] == "metier":
+        return "badge"
     n = norm(f["nom"])
     for motif, rx in REGLES:
         if re.search(norm(rx), n):
