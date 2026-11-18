@@ -98,3 +98,6 @@ td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-l
 .capturing .ed:focus{background:none;box-shadow:none}
 @media print{.tb{display:none}.ed:focus{background:none;box-shadow:none}}
 @media (max-width:760px){.tb{font-size:12px}}
+
+/* Benchmark : nom de colonne modifiable, même style que l'en-tête */
+.ed-th>.ed{font:inherit;color:inherit;text-align:inherit;letter-spacing:inherit;text-transform:inherit}

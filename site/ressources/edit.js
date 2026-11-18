@@ -128,6 +128,13 @@
     t.parentNode.replaceChild(frag, t);
   });
 
+  // a2. Benchmark : noms des colonnes (« Notre produit », « Concurrent A »…) modifiables, en-tête sur une ligne
+  if (/benchmark/.test(location.pathname)) root.querySelectorAll("thead th").forEach(function (th) {
+    th.querySelectorAll("br").forEach(function (br) { br.remove(); });
+    var t = th.textContent.replace(/\s+/g, " ").trim();
+    if (/^(Notre produit|Concurrent [A-Z])$/.test(t)) { th.setAttribute("data-hint", t); th.classList.add("ed-th"); markLine(th); }
+  });
+
   // b. Lignes « En tant que <br>je veux <br>… » : un champ à la suite de chaque début de phrase
   root.querySelectorAll(".z div").forEach(function (el) {
     if (!el.childNodes.length || el.closest("h2")) return;
