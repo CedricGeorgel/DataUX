@@ -131,8 +131,7 @@
   // a1. Pas de trait sous les champs, une indication à la place (« Prénom », « ______ »)
   root.classList.add("ed-noline");
   var persona = /persona/.test(location.pathname);
-  root.querySelectorAll(".ed-line-block").forEach(function (el) { el.setAttribute("data-hint", persona ? "Prénom" : new Array(80).join("_")); });
-  root.querySelectorAll(".ed-under").forEach(function (el) { el.setAttribute("data-hint", new Array(80).join("_")); });
+  root.querySelectorAll(".ed-line-block").forEach(function (el) { if (persona) el.setAttribute("data-hint", "Prénom"); });
 
   // a2. Benchmark : noms des colonnes (« Notre produit », « Concurrent A »…) modifiables, en-tête sur une ligne
   if (/benchmark/.test(location.pathname)) root.querySelectorAll("thead th").forEach(function (th) {
@@ -267,6 +266,8 @@
       if (el.classList.contains("lo")) { el.style.flex = "none"; el.style.height = Math.max(12, Math.floor(sizes[i].h)) + "px"; el.style.minHeight = "0"; }
       // Texte d'aide déjà présent (« Passer de… à… », « Comment pourrions-nous… ? ») : affiché en indication
       var hint = el.getAttribute("data-hint") || el.innerText.replace(/\s+/g, " ").trim();
+      // Champ souligné sans indication : une ligne de « ____ » grise remplace le trait
+      if (!hint && el.matches(".ed-under, .ed-line-block")) hint = new Array(80).join("_");
       if (hint) w.setAttribute("data-ph", hint);
       while (el.firstChild) el.removeChild(el.firstChild);
       el.appendChild(w);
