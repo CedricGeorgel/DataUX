@@ -128,6 +128,13 @@
     t.parentNode.replaceChild(frag, t);
   });
 
+  // a1. Persona : pas de trait sous les champs, une indication à la place (« Prénom », « ______ »)
+  if (/persona/.test(location.pathname)) {
+    root.classList.add("ed-noline");
+    root.querySelectorAll(".ed-line-block").forEach(function (el) { el.setAttribute("data-hint", "Prénom"); });
+    root.querySelectorAll(".ed-under").forEach(function (el) { el.setAttribute("data-hint", new Array(80).join("_")); });
+  }
+
   // a2. Benchmark : noms des colonnes (« Notre produit », « Concurrent A »…) modifiables, en-tête sur une ligne
   if (/benchmark/.test(location.pathname)) root.querySelectorAll("thead th").forEach(function (th) {
     th.querySelectorAll("br").forEach(function (br) { br.remove(); });

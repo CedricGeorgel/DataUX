@@ -101,3 +101,7 @@ td.calc{background:var(--surface,#f7f4f1)!important;vertical-align:top;padding-l
 
 /* Benchmark : nom de colonne modifiable, même style que l'en-tête */
 .ed-th>.ed{font:inherit;color:inherit;text-align:inherit;letter-spacing:inherit;text-transform:inherit}
+
+/* Persona : champs sans trait, l'indication grise tient lieu de ligne */
+.ed-noline .ed-under,.ed-noline .ed-line-block{border-bottom:0}
+.ed-noline .ed-under>.ed:empty::before{color:var(--line,#c9c2bb);letter-spacing:0}
