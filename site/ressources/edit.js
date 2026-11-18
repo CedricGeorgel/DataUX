@@ -267,7 +267,7 @@
       // Texte d'aide déjà présent (« Passer de… à… », « Comment pourrions-nous… ? ») : affiché en indication
       var hint = el.getAttribute("data-hint") || el.innerText.replace(/\s+/g, " ").trim();
       // Champ souligné sans indication : une ligne de « ____ » grise remplace le trait
-      if (!hint && el.matches(".ed-under, .ed-line-block")) hint = new Array(80).join("_");
+      if (!hint && el.matches(".ed-under, .ed-line-block")) hint = new Array(300).join("_");
       if (hint) w.setAttribute("data-ph", hint);
       while (el.firstChild) el.removeChild(el.firstChild);
       el.appendChild(w);
