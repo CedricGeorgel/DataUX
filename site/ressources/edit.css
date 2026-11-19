@@ -184,6 +184,15 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .mf-yn button{flex:1;min-height:44px;font:inherit;border:1px solid #c9c2bb;border-radius:3px;background:#fff;color:#141414;cursor:pointer}
 .mf-yn button[aria-pressed="true"]{background:#141414;border-color:#141414;color:#fff}
 .mf-l{display:block;margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#555}
+.mform textarea{box-sizing:border-box;width:100%;font:inherit;padding:8px 10px;border:1px solid #c9c2bb;border-radius:3px;margin-bottom:14px;resize:vertical}
+.mform input.mf-in{display:inline-block;width:3.5em;min-height:36px;margin:0 4px;padding:4px 6px;text-align:center}
+.mf-help{margin:0 0 12px;color:#555;font-size:15px}
+.mf-s .mf-send{width:100%}
+.mf-alt{width:100%;min-height:48px;margin-top:10px;font:inherit;font-size:17px;border:1px solid #141414;border-radius:3px;background:#fff;color:#141414;cursor:pointer}
+.mf-onsite{display:flex;flex-direction:column;gap:18px}
+.mf-onsite:empty{display:none}
+.mf-foot{display:flex;justify-content:center;gap:24px;margin:0 16px 32px}
+.mf-link{font:15px 'Cactus Classical Serif',Georgia,serif;background:none;border:0;color:#555;text-decoration:underline;min-height:44px;cursor:pointer}
 .mform input{box-sizing:border-box;width:100%;min-height:44px;font:inherit;padding:8px 10px;border:1px solid #c9c2bb;border-radius:3px;margin-bottom:14px}
 .mf-pad{position:relative;border:1px dashed #8f867e;border-radius:3px;background:#fff}
 .mf-pad canvas{display:block;width:100%;touch-action:none}
@@ -194,4 +203,5 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .mf-pv{margin:8px 0 0;font-size:13px;color:#555}
 .mf-sheet{margin:0 16px 32px;overflow:hidden;position:relative;box-shadow:0 1px 4px rgba(0,0,0,.12)}
 .mf-sheet .root{margin:0!important;transform-origin:0 0;position:absolute;left:0;top:0}
-.mform button:focus-visible,.mform input:focus-visible{outline:2px solid #9f6b53;outline-offset:2px}
+.mform button:focus-visible,.mform input:focus-visible,.mform textarea:focus-visible,.mf-link:focus-visible{outline:2px solid #9f6b53;outline-offset:2px}
+@media print{.mform,.mf-foot{display:none!important}.mf-sheet{height:auto!important;margin:0;box-shadow:none;overflow:visible}.mf-sheet .root{transform:none!important;position:static}}

@@ -452,7 +452,7 @@
     restore();
     if (REMOTE) applyRemote();
     // Largeur de l'écran et non de la page : la feuille A4 élargit la page au-delà de l'écran du téléphone
-    if (REMOTE && ((window.screen && screen.width <= 760) || (window.matchMedia && window.matchMedia("(max-width: 760px)").matches))) setupPhone();
+    if (CONSENT && ((window.screen && screen.width <= 760) || (window.matchMedia && window.matchMedia("(max-width: 760px)").matches))) setupPhone(!REMOTE);
     recalc();
   });
 
@@ -652,7 +652,7 @@
     } catch (err) { if (msg) msg.textContent = "Lien incomplet : demandez un nouveau lien à l'organisateur."; }
   }
   function remoteLink() { return location.origin + location.pathname + "#e=" + encodeFields(orgFields().map(function (e) { return e.textContent.trim(); })); }
-  function sendSigned(btn, note) {
+  function sendSigned(btn, note, onsite) {
     if (!sigs[0] || !sigs[0].get()) { note.textContent = "Signez dans le cadre « Participant » avant d'envoyer."; return; }
     if (!window.htmlToImage) { note.textContent = "Envoi indisponible : utilisez « Imprimer / PDF »."; return; }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -662,10 +662,10 @@
     window.htmlToImage.toBlob(root, { pixelRatio: 2, backgroundColor: "#ffffff", style: { margin: "0", outline: "0", transform: "none" } }).then(function (blob) {
       var file = new File([blob], "consentement-signe.png", { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        return navigator.share({ files: [file], title: "Formulaire de consentement signé" }).then(function () { note.textContent = "Formulaire envoyé. Merci !"; });
+        return navigator.share({ files: [file], title: "Formulaire de consentement signé" }).then(function () { note.textContent = onsite ? "Formulaire enregistré." : "Formulaire envoyé. Merci !"; });
       }
       var a = mk("a"); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
-      note.textContent = "Image enregistrée. Joignez-la à un e-mail" + (contact ? " à : " + contact : " à l'organisateur") + ".";
+      note.textContent = onsite ? "Image enregistrée dans vos téléchargements." : "Image enregistrée. Joignez-la à un e-mail" + (contact ? " à : " + contact : " à l'organisateur") + ".";
     }).catch(function (err) {
       if (err && err.name === "AbortError") { note.textContent = ""; return; }
       note.textContent = "L'image n'a pas pu être créée. Essayez « Imprimer / PDF ».";
@@ -674,78 +674,175 @@
 
   /* Consentement à distance sur téléphone : un formulaire vertical, lisible et signable au doigt.
      Il remplit la feuille A4 (réduite en aperçu dessous), qui reste le document envoyé. */
-  function setupPhone() {
-    var z = consentZones(), form = mk("div", "mform");
+  function setupPhone(org) {
+    var z = consentZones(), form = mk("div", "mform"), uid = 0;
     document.body.classList.add("phone-remote");
-    function sec(title) { var s = mk("section", "mf-s"), h = mk("h2"); h.textContent = title; s.appendChild(h); form.appendChild(s); return s; }
-    var head = mk("div", "mf-h"), t = mk("h1"); t.textContent = "Formulaire de consentement";
-    var pr = root.querySelector(".fld [data-ed]"); head.appendChild(t);
-    if (pr && pr.textContent.trim()) { var p0 = mk("p"); p0.textContent = pr.textContent.trim(); head.appendChild(p0); }
-    form.appendChild(head);
-    // L'étude : lignes remplies par l'organisateur
-    var s1 = sec("L'étude"); s1.classList.add("mf-ro"); var dl = mk("dl"), lastLabel = "";
-    z[0].querySelectorAll(".kv").forEach(function (kv) {
-      var b = kv.querySelector("b"), e = kv.querySelector("[data-ed]"), v = e ? e.textContent.trim() : "";
-      var lab = b ? b.textContent.trim() : ""; if (lab) lastLabel = lab;
-      if (!v) return;
-      if (!lab && dl.lastElementChild && dl.lastElementChild.tagName === "DD") { dl.lastElementChild.textContent += " " + v; return; }
-      var dt = mk("dt"), dd = mk("dd"); dt.textContent = lab || lastLabel; dd.textContent = v; dl.appendChild(dt); dl.appendChild(dd);
-    });
-    s1.appendChild(dl);
-    // Vos droits : le texte de la feuille, avec la durée de conservation remplie
-    var s2 = sec("Vos droits"); s2.classList.add("mf-ro"); var ul = mk("ul");
-    z[1].querySelectorAll("li").forEach(function (li) { var l = mk("li"); l.textContent = li.textContent.replace(/\s+/g, " ").trim(); ul.appendChild(l); });
-    s2.appendChild(ul);
-    // J'accepte : oui / non, reliés aux cases de la feuille
-    var s3 = sec("J'accepte");
-    z[2].querySelectorAll(".cbl").forEach(function (row, i) {
-      var yn = row.querySelectorAll(".yn > i"), q = mk("div", "mf-q"), lab = mk("p"), bt = mk("div", "mf-yn");
-      lab.textContent = (row.querySelector(".cb") || row).textContent.trim(); q.appendChild(lab);
-      ["Oui", "Non"].forEach(function (txt, k) {
-        var b = mk("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-pressed", yn[k] && yn[k].getAttribute("aria-checked") === "true" ? "true" : "false");
-        b.addEventListener("click", function () {
-          if (!yn[k]) return;
-          if (yn[k].getAttribute("aria-checked") !== "true") yn[k].click();
-          bt.querySelectorAll("button").forEach(function (o, j) { o.setAttribute("aria-pressed", yn[j] && yn[j].getAttribute("aria-checked") === "true" ? "true" : "false"); });
-        });
-        bt.appendChild(b);
+    function sec(title, parent) { var s = mk("section", "mf-s"), h = mk("h2"); h.textContent = title; s.appendChild(h); (parent || form).appendChild(s); return s; }
+    function today() { var t = new Date(); return ("0" + t.getDate()).slice(-2) + "/" + ("0" + (t.getMonth() + 1)).slice(-2) + "/" + t.getFullYear(); }
+    function push(ed, v) { ed.textContent = v; ed.dispatchEvent(new Event("input", { bubbles: true })); save(); }
+    // Un texte réparti sur plusieurs lignes de la feuille (ex. « Objet » sur deux lignes)
+    var meas = document.createElement("canvas").getContext("2d");
+    function spread(eds, text) {
+      var words = text.trim().split(/\s+/).filter(Boolean);
+      eds.forEach(function (ed, i) {
+        if (i === eds.length - 1) { push(ed, words.join(" ")); words = []; return; }
+        meas.font = getComputedStyle(ed).font; var w = ed.clientWidth - 4, line = "";
+        while (words.length && meas.measureText(line ? line + " " + words[0] : words[0]).width <= w) line = line ? line + " " + words.shift() : words.shift();
+        push(ed, line);
       });
-      q.appendChild(bt); s3.appendChild(q);
+    }
+    // Champ du téléphone relié à un ou plusieurs champs de la feuille
+    function field(parent, label, eds, opts) {
+      opts = opts || {}; var id = "mf-f" + (++uid);
+      var l = mk("label", "mf-l"), inp = mk(opts.area ? "textarea" : "input");
+      l.textContent = label; l.setAttribute("for", id); inp.id = id; if (!opts.area) inp.type = "text"; else inp.rows = 3;
+      if (opts.ac) inp.autocomplete = opts.ac;
+      inp.value = eds.map(function (e) { return e.textContent.trim(); }).filter(Boolean).join(" ");
+      inp.addEventListener("input", function () { if (eds.length > 1) spread(eds, inp.value); else push(eds[0], inp.value); });
+      parent.appendChild(l); parent.appendChild(inp); return inp;
+    }
+    // Pavé de signature au doigt, recopié dans la signature de la feuille
+    function sigField(parent, label, idx, zone) {
+      var sl = mk("p", "mf-l"); sl.textContent = label; parent.appendChild(sl);
+      var pad = mk("div", "mf-pad"), cv = mk("canvas"), clr = mk("button", "mf-x");
+      cv.setAttribute("aria-label", label + " : signez avec le doigt"); clr.type = "button"; clr.textContent = "Effacer";
+      pad.appendChild(cv); pad.appendChild(clr); parent.appendChild(pad);
+      var W = pad.clientWidth, H = 170, ctx;
+      cv.width = W * 2; cv.height = H * 2; cv.style.height = H + "px"; ctx = cv.getContext("2d"); ctx.scale(2, 2);
+      ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141414";
+      var existing = sigs[idx] && sigs[idx].get();
+      if (existing) { var im0 = new Image(); im0.onload = function () { var k = Math.min(W / im0.width, H / im0.height); ctx.drawImage(im0, (W - im0.width * k) / 2, (H - im0.height * k) / 2, im0.width * k, im0.height * k); }; im0.src = existing; }
+      function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+      ink(cv, ctx, pt, null, function () {
+        var d = zone.querySelectorAll(".kv [data-ed]")[1];
+        if (d && !d.textContent.trim()) d.textContent = today();
+        if (sigs[idx]) sigs[idx].set(cv.toDataURL("image/png")); save();
+      });
+      clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); if (sigs[idx]) sigs[idx].set(""); save(); });
+    }
+
+    var head = mk("div", "mf-h"), t = mk("h1"); t.textContent = "Formulaire de consentement"; head.appendChild(t);
+    var flds = root.querySelectorAll(".fld > span");
+    if (org) {
+      form.appendChild(head);
+      var s0 = sec("Le projet");
+      flds.forEach(function (sp) { var b = sp.querySelector("b"), e = sp.querySelector("[data-ed]"); if (b && e) field(s0, b.textContent.trim(), [e]); });
+    } else {
+      var pr = root.querySelector(".fld [data-ed]");
+      if (pr && pr.textContent.trim()) { var p0 = mk("p"); p0.textContent = pr.textContent.trim(); head.appendChild(p0); }
+      form.appendChild(head);
+    }
+    // L'étude
+    var s1 = sec("L'étude");
+    if (org) {
+      var groups = [];
+      z[0].querySelectorAll(".kv").forEach(function (kv) {
+        var b = kv.querySelector("b"), e = kv.querySelector("[data-ed]"), lab = b ? b.textContent.trim() : "";
+        if (!e) return;
+        if (!lab && groups.length) groups[groups.length - 1].eds.push(e); else groups.push({ lab: lab, eds: [e] });
+      });
+      groups.forEach(function (g) {
+        field(s1, g.lab, g.eds, { area: g.eds.length > 1, ac: g.lab === "Contact" ? "email" : "" });
+      });
+    } else {
+      s1.classList.add("mf-ro"); var dl = mk("dl"), lastLabel = "";
+      z[0].querySelectorAll(".kv").forEach(function (kv) {
+        var b = kv.querySelector("b"), e = kv.querySelector("[data-ed]"), v = e ? e.textContent.trim() : "";
+        var lab = b ? b.textContent.trim() : ""; if (lab) lastLabel = lab;
+        if (!v) return;
+        if (!lab && dl.lastElementChild && dl.lastElementChild.tagName === "DD") { dl.lastElementChild.textContent += " " + v; return; }
+        var dt = mk("dt"), dd = mk("dd"); dt.textContent = lab || lastLabel; dd.textContent = v; dl.appendChild(dt); dl.appendChild(dd);
+      });
+      s1.appendChild(dl);
+    }
+    // Vos droits : le texte de la feuille ; côté organisateur, la durée de conservation est un champ
+    var s2 = sec("Vos droits"), ul = mk("ul");
+    if (!org) s2.classList.add("mf-ro");
+    z[1].querySelectorAll("li").forEach(function (li) {
+      var l = mk("li"), ed = li.querySelector("[data-ed]");
+      if (org && ed) {
+        li.childNodes.forEach(function (n) {
+          if (n.nodeType === 3) l.appendChild(document.createTextNode(n.textContent.replace(/\s+/g, " ")));
+          else if (n.contains(ed)) {
+            var inp = mk("input", "mf-in"); inp.type = "text"; inp.inputMode = "numeric"; inp.value = ed.textContent.trim(); inp.setAttribute("aria-label", "Durée de conservation en mois");
+            inp.addEventListener("input", function () { push(ed, inp.value); }); l.appendChild(inp);
+          } else l.appendChild(document.createTextNode(n.textContent));
+        });
+      } else l.textContent = li.textContent.replace(/\s+/g, " ").trim();
+      ul.appendChild(l);
     });
-    // Nom et signature du participant
-    var s4 = sec("Vous"), nameEd = z[3].querySelector(".kv [data-ed]");
-    var lbl = mk("label", "mf-l"), inp = mk("input"); lbl.textContent = "Votre nom"; inp.type = "text"; inp.id = "mf-nom"; lbl.setAttribute("for", "mf-nom"); inp.autocomplete = "name";
-    inp.value = nameEd ? nameEd.textContent.trim() : "";
-    inp.addEventListener("input", function () { if (!nameEd) return; nameEd.textContent = inp.value; nameEd.dispatchEvent(new Event("input", { bubbles: true })); });
-    s4.appendChild(lbl); s4.appendChild(inp);
-    var sl = mk("p", "mf-l"); sl.textContent = "Votre signature"; s4.appendChild(sl);
-    var pad = mk("div", "mf-pad"), cv = mk("canvas"), clr = mk("button", "mf-x");
-    cv.setAttribute("aria-label", "Signez ici avec le doigt"); clr.type = "button"; clr.textContent = "Effacer";
-    pad.appendChild(cv); pad.appendChild(clr); s4.appendChild(pad);
-    var send = mk("button", "mf-send"), note = mk("p", "mf-note"); send.type = "button"; send.textContent = "Envoyer le formulaire signé"; note.setAttribute("role", "status");
-    form.appendChild(send); form.appendChild(note);
-    var pv = mk("p", "mf-pv"); pv.textContent = "Le document qui sera envoyé :"; form.appendChild(pv);
+    s2.appendChild(ul);
+
+    // Partie à signer : choix oui / non, participant, et organisateur sur place
+    function signing(parent) {
+      var s3 = sec(org ? "Le participant accepte" : "J'accepte", parent);
+      z[2].querySelectorAll(".cbl").forEach(function (row) {
+        var yn = row.querySelectorAll(".yn > i"), q = mk("div", "mf-q"), lab = mk("p"), bt = mk("div", "mf-yn");
+        lab.textContent = (row.querySelector(".cb") || row).textContent.trim(); q.appendChild(lab);
+        ["Oui", "Non"].forEach(function (txt, k) {
+          var b = mk("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-pressed", yn[k] && yn[k].getAttribute("aria-checked") === "true" ? "true" : "false");
+          b.addEventListener("click", function () {
+            if (!yn[k]) return;
+            if (yn[k].getAttribute("aria-checked") !== "true") yn[k].click();
+            bt.querySelectorAll("button").forEach(function (o, j) { o.setAttribute("aria-pressed", yn[j] && yn[j].getAttribute("aria-checked") === "true" ? "true" : "false"); });
+          });
+          bt.appendChild(b);
+        });
+        q.appendChild(bt); s3.appendChild(q);
+      });
+      var s4 = sec(org ? "Participant" : "Vous", parent);
+      var nom = field(s4, org ? "Nom du participant" : "Votre nom", [z[3].querySelector(".kv [data-ed]")], { ac: org ? "off" : "name" });
+      sigField(s4, org ? "Signature du participant" : "Votre signature", 0, z[3]);
+      if (org && z[4]) {
+        var s5 = sec("Organisateur", parent);
+        field(s5, "Votre nom", [z[4].querySelector(".kv [data-ed]")], { ac: "name" });
+        sigField(s5, "Votre signature", 1, z[4]);
+      }
+      var send = mk("button", "mf-send"), note = mk("p", "mf-note"); send.type = "button"; note.setAttribute("role", "status");
+      send.textContent = org ? "Enregistrer le formulaire signé" : "Envoyer le formulaire signé";
+      parent.appendChild(send); parent.appendChild(note);
+      send.addEventListener("click", function () {
+        if (!nom.value.trim()) { note.textContent = org ? "Écrivez le nom du participant." : "Écrivez votre nom avant d'envoyer."; nom.focus(); return; }
+        sendSigned(send, note, org);
+      });
+    }
+
+    if (org) {
+      // Deux usages : envoyer un lien, ou faire signer sur place sur ce téléphone
+      var s6 = sec("Faire signer"), how = mk("p", "mf-help");
+      how.textContent = "À distance : le participant reçoit un lien, lit le formulaire, signe et vous renvoie l'image. Sur place : il signe sur ce téléphone.";
+      s6.appendChild(how);
+      var bl = mk("button", "mf-send"), bo = mk("button", "mf-alt"), ln = mk("p", "mf-note"), onsite = mk("div", "mf-onsite");
+      bl.type = bo.type = "button"; bl.textContent = "Envoyer un lien au participant"; bo.textContent = "Faire signer sur place"; ln.setAttribute("role", "status");
+      s6.appendChild(bl); s6.appendChild(ln); s6.appendChild(bo);
+      bl.addEventListener("click", function () {
+        var url = remoteLink();
+        var copied = function () { ln.textContent = "Lien copié. Collez-le dans un message au participant."; };
+        if (navigator.share) {
+          navigator.share({ title: "Formulaire de consentement", text: "Merci de lire, signer et me renvoyer ce formulaire :", url: url })
+            .then(function () { ln.textContent = "Lien envoyé. Le participant vous renverra l'image signée."; }, function (err) { if (!err || err.name !== "AbortError") ln.textContent = "Partage impossible : réessayez."; });
+        } else if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(copied, function () { ln.textContent = url; });
+        else ln.textContent = url;
+      });
+      form.appendChild(onsite);
+      bo.addEventListener("click", function () {
+        if (!onsite.firstChild) signing(onsite);
+        bo.hidden = true; onsite.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } else signing(form);
+
+    var pv = mk("p", "mf-pv"); pv.textContent = org ? "Aperçu de la feuille :" : "Le document qui sera envoyé :"; form.appendChild(pv);
     // Aperçu de la feuille, réduite à la largeur de l'écran
     var wrap = mk("div", "mf-sheet"); root.parentNode.insertBefore(form, root); root.parentNode.insertBefore(wrap, root); wrap.appendChild(root);
     function fit() { var k = wrap.clientWidth / 1123; root.style.transform = "scale(" + k + ")"; wrap.style.height = (794 * k) + "px"; }
     fit(); window.addEventListener("resize", fit);
-    // Le pavé de signature
-    var W = pad.clientWidth, H = 170, ctx;
-    cv.width = W * 2; cv.height = H * 2; cv.style.height = H + "px"; ctx = cv.getContext("2d"); ctx.scale(2, 2);
-    ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141414";
-    var existing = sigs[0] && sigs[0].get();
-    if (existing) { var im0 = new Image(); im0.onload = function () { var k = Math.min(W / im0.width, H / im0.height); ctx.drawImage(im0, (W - im0.width * k) / 2, (H - im0.height * k) / 2, im0.width * k, im0.height * k); }; im0.src = existing; }
-    function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
-    ink(cv, ctx, pt, null, function () {
-      var d = z[3].querySelectorAll(".kv [data-ed]")[1];
-      if (d && !d.textContent.trim()) { var t2 = new Date(); d.textContent = ("0" + t2.getDate()).slice(-2) + "/" + ("0" + (t2.getMonth() + 1)).slice(-2) + "/" + t2.getFullYear(); }
-      if (sigs[0]) sigs[0].set(cv.toDataURL("image/png")); save();
-    });
-    clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); if (sigs[0]) sigs[0].set(""); save(); });
-    send.addEventListener("click", function () {
-      if (!inp.value.trim()) { note.textContent = "Écrivez votre nom avant d'envoyer."; inp.focus(); return; }
-      sendSigned(send, note);
-    });
+    if (org) {
+      var foot = mk("div", "mf-foot"), pb = mk("button", "mf-link"), cb2 = mk("button", "mf-link");
+      pb.type = cb2.type = "button"; pb.textContent = "Imprimer"; cb2.textContent = "Tout effacer";
+      pb.addEventListener("click", function () { window.print(); });
+      cb2.addEventListener("click", function () { var x = document.querySelector('.tb [data-a="clear"]'); if (x) x.click(); });
+      foot.appendChild(pb); foot.appendChild(cb2); wrap.parentNode.insertBefore(foot, wrap.nextSibling);
+    }
   }
 
   /* 4 ter. Photo du persona : import d'une image ou avatar généré (DiceBear Notionists, CC0) */
