@@ -256,29 +256,36 @@
   var rapport = /rapport-de-test/.test(PATH) ? rowsOf(root.querySelector("table")) : null;
   function setMark(b, v) { b.textContent = v || ""; b.setAttribute("data-v", v || ""); b.setAttribute("aria-label", v ? "Résultat " + v + ", changer" : "Choisir un résultat"); }
   function closeMarks() { if (markPick) { markPick.remove(); markPick = null; } }
-  if (rapport) {
-    rapport.forEach(function (tr) {
-      for (var c = 1; c < tr.children.length - 1; c++) {
-        var td = tr.children[c], b = mk("button", "mk"); b.type = "button";
-        td.setAttribute("data-calc", ""); td.appendChild(b); setMark(b, ""); marks.push(b);
-        b.addEventListener("click", function (e) {
-          var btn = e.currentTarget; e.stopPropagation(); closeMarks();
-          markPick = mk("div", "emo-pick mk-pick");
-          [["✓", "réussi"], ["~", "avec aide"], ["✗", "échec"], ["", "Effacer"]].forEach(function (o) {
-            var x = mk("button", o[0] ? "" : "clr"); x.type = "button"; x.textContent = o[0] ? o[0] + " " + o[1] : o[1];
-            x.addEventListener("click", function () { setMark(btn, o[0]); closeMarks(); save(); btn.focus(); });
-            markPick.appendChild(x);
-          });
-          var r = btn.getBoundingClientRect();
-          markPick.style.left = (r.left + window.scrollX) + "px"; markPick.style.top = (r.bottom + 4 + window.scrollY) + "px";
-          document.body.appendChild(markPick); markPick.querySelector("button").focus();
-        });
-      }
-      lockCalc(tr.lastElementChild.querySelector(".pct"));
+  // Case à choix dans un menu (✓ ~ ✗ du rapport de test, niveaux 0 à 4 de la matrice de compétences)
+  function pickerCell(td, opts) {
+    var b = mk("button", "mk"); b.type = "button";
+    td.setAttribute("data-calc", ""); td.appendChild(b); setMark(b, ""); marks.push(b);
+    b.addEventListener("click", function (e) {
+      e.stopPropagation(); closeMarks();
+      markPick = mk("div", "emo-pick mk-pick");
+      opts.concat([["", "Effacer"]]).forEach(function (o) {
+        var x = mk("button", o[0] ? "" : "clr"); x.type = "button"; x.textContent = o[0] ? o[0] + " " + o[1] : o[1];
+        x.addEventListener("click", function () { setMark(b, o[0]); closeMarks(); save(); b.focus(); });
+        markPick.appendChild(x);
+      });
+      var r = b.getBoundingClientRect();
+      markPick.style.left = (r.left + window.scrollX) + "px"; markPick.style.top = (r.bottom + 4 + window.scrollY) + "px";
+      document.body.appendChild(markPick); markPick.querySelector("button").focus();
     });
+  }
+  var matrice = /matrice-de-competences/.test(PATH) ? rowsOf(root.querySelector(".mc table")) : null;
+  if (rapport || matrice) {
     document.addEventListener("click", function (e) { if (markPick && !markPick.contains(e.target)) closeMarks(); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMarks(); });
   }
+  if (rapport) rapport.forEach(function (tr) {
+    for (var c = 1; c < tr.children.length - 1; c++) pickerCell(tr.children[c], [["✓", "réussi"], ["~", "avec aide"], ["✗", "échec"]]);
+    lockCalc(tr.lastElementChild.querySelector(".pct"));
+  });
+  if (matrice) matrice.forEach(function (tr, ri) {
+    for (var c = 1; c < tr.children.length - 1; c++) pickerCell(tr.children[c], [["0", "aucune"], ["1", "notions"], ["2", "autonome"], ["3", "confirmé"], ["4", "référent"]]);
+    if (ri === matrice.length - 1) lockCalc(tr.lastElementChild);
+  });
   // États d'un écran : chaque case passe de vide à « fait », « à faire », « sans objet »
   var tris = [], TRI_S = ["", "oui", "non", "na"], TRI_L = { "": "Pas renseigné", oui: "Fait", non: "À faire", na: "Sans objet" };
   function setTri(i, s) { i.setAttribute("data-s", s); i.setAttribute("aria-label", TRI_L[s]); i.setAttribute("title", TRI_L[s]); }
@@ -390,7 +397,8 @@
     boxes.forEach(function (el, i) {
       var line = el.hasAttribute("data-line");
       var w = mk("div", "ed" + (line ? " ed-l" : ""));
-      if (!line) w.style.height = Math.max(12, Math.floor(sizes[i].h)) + "px";
+      // Dans une case de tableau, 2 px de marge : sinon les arrondis s'additionnent et la dernière ligne déborde
+      if (!line) w.style.height = Math.max(12, Math.floor(sizes[i].h) - (el.tagName === "TD" ? 2 : 0)) + "px";
       if (el.classList.contains("lo")) { el.style.flex = "none"; el.style.height = Math.max(12, Math.floor(sizes[i].h)) + "px"; el.style.minHeight = "0"; }
       // Texte d'aide déjà présent (« Passer de… à… », « Comment pourrions-nous… ? ») : affiché en indication
       var hint = el.getAttribute("data-hint") || el.innerText.replace(/\s+/g, " ").trim();

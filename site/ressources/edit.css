@@ -140,3 +140,9 @@ svg.links .lk-hit{stroke:transparent;stroke-width:12;pointer-events:stroke;curso
 td.ro{background:var(--surface,#f7f4f1)!important}
 td.calc{display:table-cell!important;margin-top:0!important}
 .ed-noline .pov u.ed-under{border-bottom:0}
+/* Phrases à compléter (JTBD, Énoncé) : le texte saisi sur la ligne de base de l'étiquette */
+.ed-noline .pov{align-items:baseline}
+.ed-noline .pov u.ed-under{height:auto;display:block}
+.ed-noline .pov u.ed-under>.ed{font-size:13px;line-height:20px}
+.mc .mk{font-size:14px}
+.mc td[data-calc]{vertical-align:middle}
