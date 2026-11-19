@@ -265,6 +265,12 @@
   // Rapport de test : ✓ ~ ✗ choisis dans un menu, réussite calculée
   var marks = [], markPick = null;
   var rapport = /rapport-de-test/.test(PATH) ? rowsOf(root.querySelector("table")) : null;
+  // Ligne « Total ✓ » (rainbow spreadsheet) : réussites par participant, calculées
+  var rapportTot = rapport && rapport.length && rapport[rapport.length - 1].classList.contains("tot") ? rapport.pop() : null;
+  if (rapportTot) {
+    for (var tc = 1; tc < rapportTot.children.length - 1; tc++) lockCalc(rapportTot.children[tc]);
+    lockCalc(rapportTot.lastElementChild.querySelector(".pct"));
+  }
   // La valeur est dans un span : la matrice de compétences l'entoure d'un petit rond, comme sa légende
   function setMark(b, v) { b.innerHTML = ""; if (v) { var t = mk("span"); t.textContent = v; b.appendChild(t); } b.setAttribute("data-v", v || ""); b.setAttribute("aria-label", v ? "Résultat " + v + ", changer" : "Choisir un résultat"); }
   function closeMarks() { if (markPick) { markPick.remove(); markPick = null; } }
@@ -356,6 +362,15 @@
       tr.querySelectorAll(".mk").forEach(function (b) { var v = b.getAttribute("data-v"); if (v) { n++; if (v === "✓") ok++; } });
       var p = tr.lastElementChild.querySelector(".pct"); if (p) put(p, n ? String(Math.round(ok * 100 / n)) : "");
     });
+    if (rapportTot) {
+      var all = 0, alln = 0;
+      for (var c = 1; c < rapportTot.children.length - 1; c++) {
+        var okc = 0, nc = 0;
+        rapport.forEach(function (tr) { var b = tr.children[c] && tr.children[c].querySelector(".mk"), v = b && b.getAttribute("data-v"); if (v) { nc++; if (v === "✓") okc++; } });
+        put(rapportTot.children[c], nc ? String(okc) : ""); all += okc; alln += nc;
+      }
+      put(rapportTot.lastElementChild.querySelector(".pct"), alln ? String(Math.round(all * 100 / alln)) : "");
+    }
     swatches();
     if (ECO) drawLinks();
   }
