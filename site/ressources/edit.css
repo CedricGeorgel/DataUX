@@ -205,3 +205,20 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .mf-sheet .root{margin:0!important;transform-origin:0 0;position:absolute;left:0;top:0}
 .mform button:focus-visible,.mform input:focus-visible,.mform textarea:focus-visible,.mf-link:focus-visible{outline:2px solid #9f6b53;outline-offset:2px}
 @media print{.mform,.mf-foot{display:none!important}.mf-sheet{height:auto!important;margin:0;box-shadow:none;overflow:visible}.mf-sheet .root{transform:none!important;position:static}}
+.tb .tb-link{color:#555;text-decoration:underline;padding:7px 4px}
+.tb .tb-link:focus-visible{outline:2px solid #9f6b53;outline-offset:2px}
+@media print{.tb-papier{display:none}}
+
+/* Vue téléphone des fiches de terrain */
+.phone-sheet .tb-below{display:none}
+.mf-card{padding:0}
+.mf-card summary{list-style:none;cursor:pointer;padding:14px 16px;min-height:24px;font:400 17px/1.3 Laze,'Cactus Classical Serif',serif;display:flex;gap:10px;align-items:baseline}
+.mf-card summary::-webkit-details-marker{display:none}
+.mf-card summary::after{content:attr(data-sub);font:14px/1.3 'Cactus Classical Serif',Georgia,serif;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.mf-card summary::before{content:"+";order:2;color:#8f867e;font:18px/1 'Cactus Classical Serif',Georgia,serif}
+.mf-card[open] summary::before{content:"−"}
+.mf-card[open] summary{border-bottom:1px solid #e3ddd7}
+.mf-cb{padding:14px 16px 2px}
+.mf-cards{display:flex;flex-direction:column;gap:10px}
+.mform textarea.mf-big{margin-bottom:0;min-height:120px}
+@media print{.phone-sheet .mform{display:none!important}.phone-sheet .mf-sheet{height:auto!important;margin:0;box-shadow:none;overflow:visible}.phone-sheet .mf-sheet .root{transform:none!important;position:static}}

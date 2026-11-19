@@ -6,6 +6,15 @@
   "use strict";
   var root = document.querySelector(".root");
   if (!root) return;
+  // Version papier vierge (?papier) : la feuille telle qu'imprimée, sans saisie ni couleurs du web
+  if (/[?&]papier\b/.test(location.search)) {
+    document.documentElement.classList.add("papier");
+    var pb = document.createElement("div"); pb.className = "tb tb-papier";
+    pb.innerHTML = '<span class="msg">Version papier vierge, à imprimer et remplir au stylo.</span><button type="button">Imprimer</button>';
+    pb.querySelector("button").addEventListener("click", function () { window.print(); });
+    document.body.insertBefore(pb, document.body.firstChild);
+    return;
+  }
   var KEY = "dataux-fiche:" + location.pathname;
   // Consentement signé à distance : la saisie du participant est gardée à part de celle de l'organisateur
   if (/^#e=/.test(location.hash)) KEY += ":distance:" + location.hash.slice(3, 40);
@@ -453,6 +462,7 @@
     if (REMOTE) applyRemote();
     // Largeur de l'écran et non de la page : la feuille A4 élargit la page au-delà de l'écran du téléphone
     if (CONSENT && ((window.screen && screen.width <= 760) || (window.matchMedia && window.matchMedia("(max-width: 760px)").matches))) setupPhone(!REMOTE);
+    if (!CONSENT && PHONE_SHEET && ((window.screen && screen.width <= 760) || (window.matchMedia && window.matchMedia("(max-width: 760px)").matches))) setupPhoneSheet();
     recalc();
   });
 
@@ -845,6 +855,91 @@
     }
   }
 
+  /* Vue téléphone des fiches remplies sur le terrain (journal de bord, observation, prise de notes) :
+     les tableaux deviennent des fiches, les zones de grands champs. La feuille A4 reste dessous, en aperçu. */
+  var PHONE_SHEET = /journal-de-bord|grille-d-observation|grille-de-prise-de-notes/.test(location.pathname);
+  function setupPhoneSheet() {
+    var form = mk("div", "mform"), uid = 0, OBSV = /grille-d-observation/.test(location.pathname);
+    document.body.classList.add("phone-sheet");
+    function sec(title, parent) { var s = mk("section", "mf-s"), h = mk("h2"); h.textContent = title; s.appendChild(h); (parent || form).appendChild(s); return s; }
+    function val(ed) { return ed.innerText.replace(/\n$/, ""); }
+    function put(ed, v) { ed.innerText = v; save(); }
+    function field(parent, label, ed, rows) {
+      var id = "mf-f" + (++uid), l = mk("label", "mf-l"), inp = mk(rows ? "textarea" : "input");
+      l.textContent = label; l.setAttribute("for", id); inp.id = id;
+      if (rows) inp.rows = rows; else inp.type = "text";
+      inp.value = val(ed);
+      inp.addEventListener("input", function () { put(ed, inp.value); });
+      parent.appendChild(l); parent.appendChild(inp); return inp;
+    }
+    var h1 = root.querySelector("h1"), head = mk("div", "mf-h"), t = mk("h1");
+    t.textContent = h1 ? h1.textContent.trim() : ""; head.appendChild(t); form.appendChild(head);
+    // En-tête : Projet, Participant… (« Du … Au … » donne deux champs)
+    var s0 = sec("Informations");
+    root.querySelectorAll(".fld b").forEach(function (b) {
+      var n = b.nextElementSibling, ed = n && (n.matches("[data-ed]") ? n : n.querySelector("[data-ed]"));
+      if (ed) field(s0, b.textContent.trim().replace(/^./, function (c) { return c.toUpperCase(); }).replace(/^INTERVIEWVER$/i, "Interviewer"), ed);
+    });
+    // Tableaux : une fiche par ligne
+    root.querySelectorAll("table").forEach(function (tb) {
+      var heads = Array.prototype.map.call(tb.querySelectorAll("thead th"), function (th) { return th.textContent.trim(); });
+      var rows = Array.prototype.slice.call(tb.querySelectorAll("tbody tr")), cards = [];
+      var list = mk("div", "mf-cards"); form.appendChild(list);
+      rows.forEach(function (tr, i) {
+        var tds = tr.querySelectorAll("td"), key = tr.querySelector("td.n"), eds = [];
+        var card = mk("details", "mf-s mf-card"), sum = mk("summary"), body = mk("div", "mf-cb");
+        var name = key ? key.textContent.trim() : "Observation " + (i + 1);
+        sum.textContent = name; card.appendChild(sum); card.appendChild(body);
+        tds.forEach(function (td, c) {
+          var ed = td.querySelector("[data-ed]"); if (!ed) return;
+          eds.push(ed);
+          var inp = field(body, heads[c] || "", ed, /heure|moment|jour/i.test(heads[c] || "") ? 0 : 3);
+          if (OBSV && /heure/i.test(heads[c] || "")) {
+            inp.inputMode = "numeric"; card._heure = inp; card._heureEd = ed;
+          }
+        });
+        // Observation : l'heure se remplit toute seule à la première saisie
+        if (card._heure) body.addEventListener("input", function (e) {
+          if (e.target === card._heure || card._heure.value) return;
+          var d = new Date(); card._heure.value = ("0" + d.getHours()).slice(-2) + "h" + ("0" + d.getMinutes()).slice(-2); put(card._heureEd, card._heure.value);
+        });
+        var filled = eds.some(function (e) { return val(e).trim(); });
+        card._filled = filled;
+        function title() { var f = eds.map(val).filter(function (v) { return v.trim(); }); sum.setAttribute("data-sub", f.length ? f[f.length > 1 ? 1 : 0].split("\n")[0].slice(0, 40) : ""); }
+        title(); body.addEventListener("input", title);
+        list.appendChild(card); cards.push(card);
+      });
+      // Journal : toutes les journées, la première vide ouverte. Observation : les remplies + une vide, puis « Ajouter ».
+      var firstEmpty = cards.filter(function (c) { return !c._filled; })[0];
+      if (firstEmpty) firstEmpty.open = true;
+      if (OBSV) {
+        var shown = cards.filter(function (c) { return c._filled; }).length + 1;
+        cards.forEach(function (c, i) { c.hidden = i >= shown; });
+        var add = mk("button", "mf-alt"); add.type = "button"; add.textContent = "+ Ajouter une observation";
+        add.addEventListener("click", function () {
+          var next = cards.filter(function (c) { return c.hidden; })[0]; if (!next) return;
+          cards.forEach(function (c) { c.open = false; }); next.hidden = false; next.open = true;
+          var f = next.querySelector("textarea, input"); if (f) f.focus();
+          if (!cards.some(function (c) { return c.hidden; })) add.hidden = true;
+        });
+        if (!cards.some(function (c) { return c.hidden; })) add.hidden = true;
+        form.appendChild(add);
+      }
+    });
+    // Zones de notes : un grand champ chacune
+    root.querySelectorAll(".z").forEach(function (z) {
+      var h = z.querySelector("h2"), ed = z.querySelector("[data-ed]"); if (!ed) return;
+      var s = sec(h ? h.textContent.trim() : "Notes"), inp = mk("textarea", "mf-big"), id = "mf-f" + (++uid);
+      inp.id = id; inp.rows = /chaud/i.test(s.textContent) ? 5 : 12; inp.setAttribute("aria-label", s.textContent);
+      inp.value = val(ed); inp.addEventListener("input", function () { put(ed, inp.value); }); s.appendChild(inp);
+    });
+    var pv = mk("p", "mf-pv"); pv.textContent = "Aperçu de la feuille :"; form.appendChild(pv);
+    var wrap = mk("div", "mf-sheet"); root.parentNode.insertBefore(form, root); root.parentNode.insertBefore(wrap, root); wrap.appendChild(root);
+    var W0 = root.offsetWidth, H0 = root.offsetHeight;
+    function fit() { var k = wrap.clientWidth / W0; root.style.transform = "scale(" + k + ")"; wrap.style.height = (H0 * k) + "px"; }
+    fit(); window.addEventListener("resize", fit);
+  }
+
   /* 4 ter. Photo du persona : import d'une image ou avatar généré (DiceBear Notionists, CC0) */
   var photoEl = null, photo = null, phPanel = null;
   root.querySelectorAll("div").forEach(function (d) {
@@ -1008,6 +1103,7 @@
   bar.innerHTML = '<button type="button" data-a="png">Enregistrer en image</button>' +
     '<button type="button" data-a="print">Imprimer / PDF</button>' +
     '<button type="button" data-a="clear">Tout effacer</button>' +
+    '<a class="tb-link" href="' + location.pathname + '?papier" target="_blank" rel="noopener">Version papier vierge ↗</a>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
   document.body.insertBefore(bar, document.body.firstChild);
   var msg = bar.querySelector(".msg");
