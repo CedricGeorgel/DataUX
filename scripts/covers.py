@@ -615,7 +615,7 @@ MANUEL = {
     "Experience map": "journey", "Grille de critique": "mirror", "Grille de vote": "bars", "Inventaire de contenus": "stack",
     "Inventaire de l'interface": "clusters", "Jobs to be done": "person", "Matrice de compétences": "progress",
     "Questionnaire de recrutement": "funnel", "Questionnaire SUS": "gauge", "Rapport de test": "article",
-    "Sprint Canvas": "clock", "Test d'arbre": "tree", "Ton et voix": "bubbles",
+    "Sprint Canvas": "clock", "Test d'arbre": "tree", "Ton et voix": "bubbles", "Formulaire de consentement": "badge",
 }
 
 
