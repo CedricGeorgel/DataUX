@@ -609,6 +609,13 @@ MANUEL = {
     "Illusion de profondeur explicative": "layers", "Effet de réflexion": "balance", "Heuristique d'affect": "balance",
     "Biais d'automatisation": "loop", "Biais de congruence à l'humeur": "mirror",
     "The Magical Number Seven, Plus or Minus Two": "article",
+    # Ressources ajoutées le 19/11/2026
+    "Carte de l'écosystème": "network", "Carte des hypothèses": "matrix", "Cartographie des parties prenantes": "crowd",
+    "Checklist accessibilité": "outlier", "Énoncé du problème": "target", "États d'un écran": "layers",
+    "Experience map": "journey", "Grille de critique": "mirror", "Grille de vote": "bars", "Inventaire de contenus": "stack",
+    "Inventaire de l'interface": "clusters", "Jobs to be done": "person", "Matrice de compétences": "progress",
+    "Questionnaire de recrutement": "funnel", "Questionnaire SUS": "gauge", "Rapport de test": "article",
+    "Sprint Canvas": "clock", "Test d'arbre": "tree", "Ton et voix": "bubbles",
 }
 
 
