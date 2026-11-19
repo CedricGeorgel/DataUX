@@ -451,6 +451,8 @@
     setupConsent();
     restore();
     if (REMOTE) applyRemote();
+    // Largeur de l'écran et non de la page : la feuille A4 élargit la page au-delà de l'écran du téléphone
+    if (REMOTE && ((window.screen && screen.width <= 760) || (window.matchMedia && window.matchMedia("(max-width: 760px)").matches))) setupPhone();
     recalc();
   });
 
@@ -605,7 +607,7 @@
     clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); data = ""; save(); });
     return {
       get: function () { return data; },
-      set: function (url) { ctx.clearRect(0, 0, W, H); data = url || ""; if (!data) return; var im = new Image(); im.onload = function () { ctx.drawImage(im, 0, 0, W, H); }; im.src = data; }
+      set: function (url) { ctx.clearRect(0, 0, W, H); data = url || ""; if (!data) return; var im = new Image(); im.onload = function () { var k = Math.min(W / im.width, H / im.height), w = im.width * k, h = im.height * k; ctx.clearRect(0, 0, W, H); ctx.drawImage(im, (W - w) / 2, (H - h) / 2, w, h); }; im.src = data; }
     };
   }
   function setupConsent() {
@@ -631,7 +633,7 @@
     btn.disabled = true; note.textContent = "Préparation de l'image…";
     document.documentElement.classList.add("capturing");
     var c = kvField("Contact"), contact = c ? c.textContent.trim() : "";
-    window.htmlToImage.toBlob(root, { pixelRatio: 2, backgroundColor: "#ffffff", style: { margin: "0", outline: "0" } }).then(function (blob) {
+    window.htmlToImage.toBlob(root, { pixelRatio: 2, backgroundColor: "#ffffff", style: { margin: "0", outline: "0", transform: "none" } }).then(function (blob) {
       var file = new File([blob], "consentement-signe.png", { type: "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         return navigator.share({ files: [file], title: "Formulaire de consentement signé" }).then(function () { note.textContent = "Formulaire envoyé. Merci !"; });
@@ -642,6 +644,86 @@
       if (err && err.name === "AbortError") { note.textContent = ""; return; }
       note.textContent = "L'image n'a pas pu être créée. Essayez « Imprimer / PDF ».";
     }).then(function () { btn.disabled = false; document.documentElement.classList.remove("capturing"); });
+  }
+
+  /* Consentement à distance sur téléphone : un formulaire vertical, lisible et signable au doigt.
+     Il remplit la feuille A4 (réduite en aperçu dessous), qui reste le document envoyé. */
+  function setupPhone() {
+    var z = consentZones(), form = mk("div", "mform");
+    document.body.classList.add("phone-remote");
+    function sec(title) { var s = mk("section", "mf-s"), h = mk("h2"); h.textContent = title; s.appendChild(h); form.appendChild(s); return s; }
+    var head = mk("div", "mf-h"), t = mk("h1"); t.textContent = "Formulaire de consentement";
+    var pr = root.querySelector(".fld [data-ed]"); head.appendChild(t);
+    if (pr && pr.textContent.trim()) { var p0 = mk("p"); p0.textContent = pr.textContent.trim(); head.appendChild(p0); }
+    form.appendChild(head);
+    // L'étude : lignes remplies par l'organisateur
+    var s1 = sec("L'étude"), dl = mk("dl"), lastLabel = "";
+    z[0].querySelectorAll(".kv").forEach(function (kv) {
+      var b = kv.querySelector("b"), e = kv.querySelector("[data-ed]"), v = e ? e.textContent.trim() : "";
+      var lab = b ? b.textContent.trim() : ""; if (lab) lastLabel = lab;
+      if (!v) return;
+      if (!lab && dl.lastElementChild && dl.lastElementChild.tagName === "DD") { dl.lastElementChild.textContent += " " + v; return; }
+      var dt = mk("dt"), dd = mk("dd"); dt.textContent = lab || lastLabel; dd.textContent = v; dl.appendChild(dt); dl.appendChild(dd);
+    });
+    s1.appendChild(dl);
+    // Vos droits : le texte de la feuille, avec la durée de conservation remplie
+    var s2 = sec("Vos droits"), ul = mk("ul");
+    z[1].querySelectorAll("li").forEach(function (li) { var l = mk("li"); l.textContent = li.textContent.replace(/\s+/g, " ").trim(); ul.appendChild(l); });
+    s2.appendChild(ul);
+    // J'accepte : oui / non, reliés aux cases de la feuille
+    var s3 = sec("J'accepte");
+    z[2].querySelectorAll(".cbl").forEach(function (row, i) {
+      var yn = row.querySelectorAll(".yn > i"), q = mk("div", "mf-q"), lab = mk("p"), bt = mk("div", "mf-yn");
+      lab.textContent = (row.querySelector(".cb") || row).textContent.trim(); q.appendChild(lab);
+      ["Oui", "Non"].forEach(function (txt, k) {
+        var b = mk("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-pressed", yn[k] && yn[k].getAttribute("aria-checked") === "true" ? "true" : "false");
+        b.addEventListener("click", function () {
+          if (!yn[k]) return;
+          if (yn[k].getAttribute("aria-checked") !== "true") yn[k].click();
+          bt.querySelectorAll("button").forEach(function (o, j) { o.setAttribute("aria-pressed", yn[j] && yn[j].getAttribute("aria-checked") === "true" ? "true" : "false"); });
+        });
+        bt.appendChild(b);
+      });
+      q.appendChild(bt); s3.appendChild(q);
+    });
+    // Nom et signature du participant
+    var s4 = sec("Vous"), nameEd = z[3].querySelector(".kv [data-ed]");
+    var lbl = mk("label", "mf-l"), inp = mk("input"); lbl.textContent = "Votre nom"; inp.type = "text"; inp.id = "mf-nom"; lbl.setAttribute("for", "mf-nom"); inp.autocomplete = "name";
+    inp.value = nameEd ? nameEd.textContent.trim() : "";
+    inp.addEventListener("input", function () { if (!nameEd) return; nameEd.textContent = inp.value; nameEd.dispatchEvent(new Event("input", { bubbles: true })); });
+    s4.appendChild(lbl); s4.appendChild(inp);
+    var sl = mk("p", "mf-l"); sl.textContent = "Votre signature"; s4.appendChild(sl);
+    var pad = mk("div", "mf-pad"), cv = mk("canvas"), clr = mk("button", "mf-x");
+    cv.setAttribute("aria-label", "Signez ici avec le doigt"); clr.type = "button"; clr.textContent = "Effacer";
+    pad.appendChild(cv); pad.appendChild(clr); s4.appendChild(pad);
+    var send = mk("button", "mf-send"), note = mk("p", "mf-note"); send.type = "button"; send.textContent = "Envoyer le formulaire signé"; note.setAttribute("role", "status");
+    form.appendChild(send); form.appendChild(note);
+    var pv = mk("p", "mf-pv"); pv.textContent = "Le document qui sera envoyé :"; form.appendChild(pv);
+    // Aperçu de la feuille, réduite à la largeur de l'écran
+    var wrap = mk("div", "mf-sheet"); root.parentNode.insertBefore(form, root); root.parentNode.insertBefore(wrap, root); wrap.appendChild(root);
+    function fit() { var k = wrap.clientWidth / 1123; root.style.transform = "scale(" + k + ")"; wrap.style.height = (794 * k) + "px"; }
+    fit(); window.addEventListener("resize", fit);
+    // Le pavé de signature
+    var W = pad.clientWidth, H = 170, ctx, last = null;
+    cv.width = W * 2; cv.height = H * 2; cv.style.height = H + "px"; ctx = cv.getContext("2d"); ctx.scale(2, 2);
+    ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141414";
+    var existing = sigs[0] && sigs[0].get();
+    if (existing) { var im0 = new Image(); im0.onload = function () { var k = Math.min(W / im0.width, H / im0.height); ctx.drawImage(im0, (W - im0.width * k) / 2, (H - im0.height * k) / 2, im0.width * k, im0.height * k); }; im0.src = existing; }
+    function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+    cv.addEventListener("pointerdown", function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); last = pt(e); ctx.beginPath(); ctx.arc(last.x, last.y, .8, 0, 7); ctx.fill(); });
+    cv.addEventListener("pointermove", function (e) { if (!last) return; var p = pt(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; });
+    function end() {
+      if (!last) return; last = null;
+      var d = z[3].querySelectorAll(".kv [data-ed]")[1];
+      if (d && !d.textContent.trim()) { var t2 = new Date(); d.textContent = ("0" + t2.getDate()).slice(-2) + "/" + ("0" + (t2.getMonth() + 1)).slice(-2) + "/" + t2.getFullYear(); }
+      if (sigs[0]) sigs[0].set(cv.toDataURL("image/png")); save();
+    }
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); if (sigs[0]) sigs[0].set(""); save(); });
+    send.addEventListener("click", function () {
+      if (!inp.value.trim()) { note.textContent = "Écrivez votre nom avant d'envoyer."; inp.focus(); return; }
+      sendSigned(send, note);
+    });
   }
 
   /* 4 ter. Photo du persona : import d'une image ou avatar généré (DiceBear Notionists, CC0) */
@@ -856,7 +938,7 @@
     btn.disabled = true; msg.textContent = "Création de l'image…";
     document.documentElement.classList.add("capturing");
     ready.then(function () {
-      return window.htmlToImage.toPng(root, { pixelRatio: 2, backgroundColor: "#ffffff", style: { margin: "0", outline: "0" } });
+      return window.htmlToImage.toPng(root, { pixelRatio: 2, backgroundColor: "#ffffff", style: { margin: "0", outline: "0", transform: "none" } });
     }).then(function (url) {
       var a = mk("a"); a.href = url; a.download = slug + ".png";
       document.body.appendChild(a); a.click(); a.remove();
