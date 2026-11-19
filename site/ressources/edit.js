@@ -61,6 +61,12 @@
     var boxes = root.querySelectorAll(".cl i, .big-score i");
     var vals = all ? [odd, even, odd + even, fr((odd + even) * 2.5)] : ["", "", "", ""];
     Array.prototype.forEach.call(boxes, function (b, i) { put(b, String(vals[i])); });
+    // Curseur sur le dégradé : où se situe le score
+    var g = root.querySelector(".gauge");
+    if (g) {
+      var m = g.querySelector(".gmark"); if (!m) { m = mk("i", "gmark"); g.appendChild(m); }
+      m.hidden = !all; if (all) m.style.left = ((odd + even) * 2.5) + "%";
+    }
   }
   function num(el) {
     var e = el && el.querySelector("[data-ed]"); if (!e) return null;
@@ -76,6 +82,7 @@
   var KANO = { M: "Obligatoire", O: "Performance", A: "Attractive", I: "Indifférente", R: "Rejetée", Q: "Douteuse" };
   function recalc() {
     if (sus) recalcSus();
+    if (typeof recalcMore === "function") recalcMore();
     if (!calc) return;
     var scores = [];
     calc.rows.forEach(function (tr, ri) {
@@ -191,7 +198,12 @@
   });
   // Fiches 2027 : ronds d'échelle (un choix par ligne), cases à cocher, oui/non, garder/exclure, gommettes de vote
   root.querySelectorAll(".os .o > i, .yn > i, .ge i").forEach(function (i) { addCheck(i, ""); i.setAttribute("data-radio", ""); });
-  root.querySelectorAll("i.box, .dotv > i").forEach(function (i) { addCheck(i, ""); });
+  var PATH = location.pathname;
+  var TRI = /etats-d-un-ecran/.test(PATH), RGAA = /checklist-accessibilite/.test(PATH);
+  // États d'un écran : les cases ont trois états (gérés plus bas) ; RGAA : oui / non / N/A exclusifs sur une ligne
+  root.querySelectorAll(TRI ? ".dotv > i" : "i.box, .dotv > i").forEach(function (i) { addCheck(i, ""); if (RGAA && i.matches("i.box")) i.setAttribute("data-radio", "tr"); });
+  // Pastilles groupées (garder / revoir…, direct / indirect / échec…) : un seul choix
+  root.querySelectorAll(".pills > .pill[data-ck]").forEach(function (p) { p.setAttribute("data-radio", ""); });
   var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), texts = [];
   while (walker.nextNode()) if (/[☐○]/.test(walker.currentNode.nodeValue)) texts.push(walker.currentNode);
   texts.forEach(function (t) {
@@ -210,7 +222,7 @@
       var grp = calc && calc.kind === "kano" && el.closest(".cbl");
       if (on && grp) grp.querySelectorAll("[data-ck]").forEach(function (o) { if (o !== el) setCheck(o, false); });
       // Échelle à ronds (aisance numérique) : un seul choix
-      if (on && el.hasAttribute("data-radio")) (el.closest(".os, .yn, .ge") || el.parentElement).querySelectorAll("[data-radio]").forEach(function (o) { if (o !== el) setCheck(o, false); });
+      if (on && el.hasAttribute("data-radio")) ((el.getAttribute("data-radio") === "tr" ? el.closest("tr") : el.closest(".os, .yn, .ge, .pills")) || el.parentElement).querySelectorAll("[data-radio]").forEach(function (o) { if (o !== el) setCheck(o, false); });
       setCheck(el, on); save();
     }
     el.addEventListener("click", toggle);
@@ -223,6 +235,92 @@
     else if (k === "○") el.textContent = on ? "●" : "○";
     else el.classList.toggle("on", on);
     el.setAttribute("aria-checked", on ? "true" : "false");
+  }
+
+  /* 2 bis. Fiches 2027 : réglages propres à certaines fiches */
+  function rowsOf(t) { return t && t.tBodies[0] ? Array.prototype.slice.call(t.tBodies[0].rows) : []; }
+  function lockCalc(el) { if (!el) return; el.setAttribute("data-calc", ""); if (el.tagName === "TD") el.classList.add("calc"); }
+  // « ____ » des phrases à compléter (Jobs to be done, Énoncé du problème) : indication grise, pas de trait
+  root.querySelectorAll(".pov u").forEach(function (u) { u.classList.add("ed-under"); });
+  // Grille de vote : total = A + B + C
+  var voteRows = /grille-de-vote/.test(PATH) ? rowsOf(root.querySelector("table")) : null;
+  if (voteRows) voteRows.forEach(function (tr) { lockCalc(tr.children[6]); });
+  // Test d'arbre : réussites directes, indirectes et échecs comptés
+  var arbre = /test-d-arbre/.test(PATH) ? { rows: rowsOf(root.querySelector("table")), out: Array.prototype.slice.call(root.querySelectorAll(".leg u.w")) } : null;
+  if (arbre) arbre.out.forEach(lockCalc);
+  // Checklist accessibilité : taux = oui ÷ (oui + non)
+  var rgaa = RGAA ? { rows: rowsOf(root.querySelector("table")), out: root.querySelector(".leg u.w") } : null;
+  if (rgaa) lockCalc(rgaa.out);
+  // Rapport de test : ✓ ~ ✗ choisis dans un menu, réussite calculée
+  var marks = [], markPick = null;
+  var rapport = /rapport-de-test/.test(PATH) ? rowsOf(root.querySelector("table")) : null;
+  function setMark(b, v) { b.textContent = v || ""; b.setAttribute("data-v", v || ""); b.setAttribute("aria-label", v ? "Résultat " + v + ", changer" : "Choisir un résultat"); }
+  function closeMarks() { if (markPick) { markPick.remove(); markPick = null; } }
+  if (rapport) {
+    rapport.forEach(function (tr) {
+      for (var c = 1; c < tr.children.length - 1; c++) {
+        var td = tr.children[c], b = mk("button", "mk"); b.type = "button";
+        td.setAttribute("data-calc", ""); td.appendChild(b); setMark(b, ""); marks.push(b);
+        b.addEventListener("click", function (e) {
+          var btn = e.currentTarget; e.stopPropagation(); closeMarks();
+          markPick = mk("div", "emo-pick mk-pick");
+          [["✓", "réussi"], ["~", "avec aide"], ["✗", "échec"], ["", "Effacer"]].forEach(function (o) {
+            var x = mk("button", o[0] ? "" : "clr"); x.type = "button"; x.textContent = o[0] ? o[0] + " " + o[1] : o[1];
+            x.addEventListener("click", function () { setMark(btn, o[0]); closeMarks(); save(); btn.focus(); });
+            markPick.appendChild(x);
+          });
+          var r = btn.getBoundingClientRect();
+          markPick.style.left = (r.left + window.scrollX) + "px"; markPick.style.top = (r.bottom + 4 + window.scrollY) + "px";
+          document.body.appendChild(markPick); markPick.querySelector("button").focus();
+        });
+      }
+      lockCalc(tr.lastElementChild.querySelector(".pct"));
+    });
+    document.addEventListener("click", function (e) { if (markPick && !markPick.contains(e.target)) closeMarks(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMarks(); });
+  }
+  // États d'un écran : chaque case passe de vide à « fait », « à faire », « sans objet »
+  var tris = [], TRI_S = ["", "oui", "non", "na"], TRI_L = { "": "Pas renseigné", oui: "Fait", non: "À faire", na: "Sans objet" };
+  function setTri(i, s) { i.setAttribute("data-s", s); i.setAttribute("aria-label", TRI_L[s]); i.setAttribute("title", TRI_L[s]); }
+  if (TRI) root.querySelectorAll("i.box").forEach(function (i) {
+    i.setAttribute("role", "button"); i.setAttribute("tabindex", "0"); setTri(i, "");
+    function next() { setTri(i, TRI_S[(TRI_S.indexOf(i.getAttribute("data-s")) + 1) % 4]); save(); }
+    i.addEventListener("click", next);
+    i.addEventListener("keydown", function (e) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); next(); } });
+    tris.push(i);
+  });
+  // Inventaire de l'interface : le code hexadécimal colore la pastille
+  function swatches() {
+    root.querySelectorAll(".sw > div").forEach(function (d) {
+      var i = d.querySelector("i"), e = d.querySelector("[data-ed]"); if (!i || !e) return;
+      var v = e.textContent.trim().replace(/^#?/, "#");
+      i.style.background = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v) ? v : "";
+    });
+  }
+  function selIdx(el, s) { var o = el ? el.querySelectorAll(s) : []; for (var i = 0; i < o.length; i++) if (o[i].getAttribute("aria-checked") === "true") return i; return -1; }
+  function recalcMore() {
+    if (voteRows) voteRows.forEach(function (tr) {
+      var t = 0, n = 0;
+      [3, 4, 5].forEach(function (c) { var k = selIdx(tr.children[c], ".o > i"); if (k >= 0) { t += k + 1; n++; } });
+      put(tr.children[6], n ? String(t) : "");
+    });
+    if (arbre) {
+      var cnt = [0, 0, 0];
+      arbre.rows.forEach(function (tr) { var k = selIdx(tr, ".pill"); if (k >= 0 && k < 3) cnt[k]++; });
+      arbre.out.forEach(function (u, i) { put(u, String(cnt[i])); });
+    }
+    if (rgaa && rgaa.out) {
+      var oui = 0, non = 0;
+      rgaa.rows.forEach(function (tr) { var b = tr.querySelectorAll("i.box"); if (b[0] && b[0].getAttribute("aria-checked") === "true") oui++; if (b[1] && b[1].getAttribute("aria-checked") === "true") non++; });
+      put(rgaa.out, oui + non ? String(Math.round(oui * 100 / (oui + non))) : "");
+    }
+    if (rapport) rapport.forEach(function (tr) {
+      var ok = 0, n = 0;
+      tr.querySelectorAll(".mk").forEach(function (b) { var v = b.getAttribute("data-v"); if (v) { n++; if (v === "✓") ok++; } });
+      var p = tr.lastElementChild.querySelector(".pct"); if (p) put(p, n ? String(Math.round(ok * 100 / n)) : "");
+    });
+    swatches();
+    if (ECO) drawLinks();
   }
 
   /* 3. Zones de saisie */
@@ -244,7 +342,7 @@
   });
   var SMALL = ".fld i, .ft .d i, u, .ini i, .kv i, .tl i, .nl i, .pct, .hl2";
   root.querySelectorAll("*").forEach(function (el) {
-    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc], svg")) return;
+    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc], svg") || el.matches(".sw i, i.box[data-s]")) return;
     if (el.matches(SMALL)) { if (empty(el)) markLine(el); return; }
     var ok = false;
     if (el.matches(".bx, .card.d, .card, .lo")) ok = !el.querySelector("[data-ck]") && (el.matches(".bx, .card.d, .lo") || empty(el));
@@ -252,7 +350,8 @@
       var r = el.getBoundingClientRect();
       ok = r.width >= 30 && r.height >= 14;
     }
-    if (ok && el.matches("td, th") && isLabelCell(el) && !emptyFirstCol(el)) ok = false;
+    // Beige = intitulé, sauf première colonne vide et ligne « Besoin de l'équipe » de la matrice de compétences
+    if (ok && el.matches("td, th") && isLabelCell(el) && !emptyFirstCol(el) && !el.closest(".mc")) ok = false;
     if (ok) markBlock(el);
   });
 
@@ -311,6 +410,12 @@
       });
       eds.push(w);
     });
+    // Fiches 2027 : toute case de tableau qu'on ne peut ni écrire ni cocher passe en beige, comme sur les anciennes fiches
+    if (/(questionnaire-sus|formulaire-de-consentement|questionnaire-de-recrutement|rapport-de-test|test-d-arbre|inventaire-de-contenus|enonce-du-probleme|jobs-to-be-done|carte-des-hypotheses|carte-de-l-ecosysteme|experience-map|grille-de-vote|etats-d-un-ecran|inventaire-de-l-interface|checklist-accessibilite|grille-de-critique|ton-et-voix|cartographie-des-parties-prenantes|matrice-de-competences|sprint-canvas)\.html$/.test(PATH))
+      root.querySelectorAll("td").forEach(function (td) {
+        if (td.classList.contains("calc") || td.hasAttribute("colspan") || td.querySelector("[data-ed], [data-ck], .mk, i.box[data-s], .calc-v")) return;
+        td.classList.add("ro");
+      });
     root.style.position = "relative";
     setupEmos();
     setupJals();
@@ -369,7 +474,16 @@
     var del = mk("button", "pi-del"); del.type = "button"; del.textContent = "×"; del.setAttribute("aria-label", "Supprimer ce post-it");
     var t = mk("div", "pi-t"); t.setAttribute("contenteditable", "true"); t.setAttribute("data-ph", ECO ? "Acteur…" : "Idée…"); t.className = "pi-t ed"; t.innerHTML = d.t || "";
     n.appendChild(grip); n.appendChild(del); n.appendChild(t); root.appendChild(n);
-    del.addEventListener("click", function () { notes.splice(notes.indexOf(n), 1); n.remove(); save(); });
+    if (ECO) {
+      n.classList.add("pi-eco");
+      var ln = mk("button", "pi-link"); ln.type = "button"; ln.textContent = "⟷"; ln.setAttribute("aria-label", "Relier cet acteur à un autre");
+      ln.addEventListener("click", function () { linkFrom(n); });
+      n.appendChild(ln);
+    }
+    del.addEventListener("click", function () {
+      links.filter(function (l) { return l.a === n || l.b === n; }).forEach(removeLink);
+      notes.splice(notes.indexOf(n), 1); n.remove(); save();
+    });
     t.addEventListener("input", save);
     t.addEventListener("paste", function (e) { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain")); });
     grip.addEventListener("pointerdown", function (e) {
@@ -378,11 +492,46 @@
       function mv(ev) {
         n.style.left = Math.min(root.clientWidth - n.offsetWidth, Math.max(0, ox + ev.clientX - sx)) + "px";
         n.style.top = Math.min(root.clientHeight - n.offsetHeight, Math.max(0, oy + ev.clientY - sy)) + "px";
+        drawLinks();
       }
       function up() { grip.removeEventListener("pointermove", mv); grip.removeEventListener("pointerup", up); save(); }
       grip.addEventListener("pointermove", mv); grip.addEventListener("pointerup", up);
     });
     notes.push(n); return n;
+  }
+
+  /* Liens entre acteurs (Carte de l'écosystème) : ⟷ sur un acteur, puis ⟷ sur un autre.
+     Un clic sur un lien change son type (échange → lien faible → tension), un 4e clic le supprime. */
+  var links = [], linkSvg = null, linkStart = null, LINK_T = ["Échange", "Lien faible", "Tension"];
+  function linkLayer() {
+    if (linkSvg) return linkSvg;
+    linkSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); linkSvg.setAttribute("class", "links");
+    linkSvg.innerHTML = '<defs><marker id="lk-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8f867e"/></marker></defs>';
+    root.appendChild(linkSvg); return linkSvg;
+  }
+  function centre(n) { return { x: n.offsetLeft + n.offsetWidth / 2, y: n.offsetTop + n.offsetHeight / 2 }; }
+  function drawLinks() {
+    links.forEach(function (l) {
+      var a = centre(l.a), b = centre(l.b);
+      l.el.setAttribute("x1", a.x); l.el.setAttribute("y1", a.y); l.el.setAttribute("x2", b.x); l.el.setAttribute("y2", b.y);
+      l.hit.setAttribute("x1", a.x); l.hit.setAttribute("y1", a.y); l.hit.setAttribute("x2", b.x); l.hit.setAttribute("y2", b.y);
+      l.el.setAttribute("class", "lk lk-" + l.t); if (l.t === 0) l.el.setAttribute("marker-end", "url(#lk-ar)"); else l.el.removeAttribute("marker-end");
+      l.hit.querySelector("title").textContent = LINK_T[l.t] + " · cliquer pour changer";
+    });
+  }
+  function addLink(a, b, t) {
+    var svg = linkLayer(), NS = "http://www.w3.org/2000/svg";
+    var el = document.createElementNS(NS, "line"), hit = document.createElementNS(NS, "line"), ti = document.createElementNS(NS, "title");
+    hit.setAttribute("class", "lk-hit"); hit.appendChild(ti); svg.appendChild(el); svg.appendChild(hit);
+    var l = { a: a, b: b, t: t || 0, el: el, hit: hit };
+    hit.addEventListener("click", function () { if (l.t >= 2) removeLink(l); else { l.t++; drawLinks(); } save(); });
+    links.push(l); drawLinks(); return l;
+  }
+  function removeLink(l) { l.el.remove(); l.hit.remove(); links.splice(links.indexOf(l), 1); }
+  function linkFrom(n) {
+    if (!linkStart) { linkStart = n; n.classList.add("pi-sel"); return; }
+    var a = linkStart; a.classList.remove("pi-sel"); linkStart = null;
+    if (a !== n && !links.some(function (l) { return (l.a === a && l.b === n) || (l.a === n && l.b === a); })) { addLink(a, n, 0); save(); }
   }
 
   /* 4 ter. Photo du persona : import d'une image ou avatar généré (DiceBear Notionists, CC0) */
@@ -518,7 +667,9 @@
         m: emos.map(function (el) { return el.textContent; }),
         p: notes.map(function (n) { return { x: n.offsetLeft, y: n.offsetTop, t: n.querySelector(".pi-t").innerHTML }; }),
         ph: photo,
-        j: jals.map(function (j) { return { x: parseFloat(j.style.left), l: j.querySelector(".jal-l").innerHTML, d: j.querySelector(".jal-d").innerHTML }; }) };
+        j: jals.map(function (j) { return { x: parseFloat(j.style.left), l: j.querySelector(".jal-l").innerHTML, d: j.querySelector(".jal-d").innerHTML }; }),
+        t: tris.map(function (i) { return i.getAttribute("data-s"); }), r: marks.map(function (b) { return b.getAttribute("data-v"); }),
+        k: links.map(function (l) { return [notes.indexOf(l.a), notes.indexOf(l.b), l.t]; }) };
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
     }, 300);
   }
@@ -530,6 +681,9 @@
       if (saved.c && saved.c.length === checks.length) checks.forEach(function (el, i) { setCheck(el, !!saved.c[i]); });
       if (saved.m && saved.m.length === emos.length) emos.forEach(function (el, i) { setEmo(el, saved.m[i]); });
       if (NOTES && saved.p) saved.p.forEach(function (d) { addNote(d); });
+      if (saved.t && saved.t.length === tris.length) tris.forEach(function (i, n) { setTri(i, saved.t[n] || ""); });
+      if (saved.r && saved.r.length === marks.length) marks.forEach(function (b, n) { setMark(b, saved.r[n]); });
+      if (ECO && saved.k) saved.k.forEach(function (k) { if (notes[k[0]] && notes[k[1]]) addLink(notes[k[0]], notes[k[1]], k[2]); });
       if (saved.j && jalLine) saved.j.forEach(function (d) { addJal(d); });
       if (saved.ph && photoEl) { photo = saved.ph; if (photo.type === "av") loadAv(renderPhoto); else renderPhoto(); }
     } catch (err) { /* rien à restaurer */ }
