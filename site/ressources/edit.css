@@ -222,3 +222,9 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .mf-cards{display:flex;flex-direction:column;gap:10px}
 .mform textarea.mf-big{margin-bottom:0;min-height:120px}
 @media print{.phone-sheet .mform{display:none!important}.phone-sheet .mf-sheet{height:auto!important;margin:0;box-shadow:none;overflow:visible}.phone-sheet .mf-sheet .root{transform:none!important;position:static}}
+/* Persona : titres renommables, zones Bio / Outils qui reprennent la place d'une zone masquée */
+.pz .ed-h2{outline:0;cursor:text;display:inline-block;min-width:20px;max-width:300px;overflow:hidden;vertical-align:bottom}
+.pz .ed-h2:hover,.pz .ed-h2:focus{box-shadow:0 1px 0 var(--accent-soft,#c9a898)}
+.pz .col:first-child .z .lo{flex:1 1 0!important;height:auto!important;min-height:0!important}
+.pz .col:first-child .z .lo>.ed{height:100%!important}
+.pz .z[hidden]{display:none}

@@ -1078,6 +1078,32 @@
     });
   }
 
+  /* 4 quater. Persona : titres des zones de droite renommables, Niveau et Bio masquables */
+  var pzTitles = [], pzHide = {}, pzZones = {};
+  if (persona) {
+    root.classList.add("pz");
+    root.querySelectorAll(".z h2").forEach(function (h) {
+      var t = h.lastChild, txt = t && t.nodeType === 3 ? t.nodeValue.trim() : "";
+      if (txt === "Niveau" || txt === "Bio") pzZones[txt] = h.closest(".z");
+      if (!h.closest(".col.fill") || !txt) return;
+      var s = mk("span", "ed-h2"); s.textContent = txt; s.setAttribute("data-orig", txt);
+      s.setAttribute("contenteditable", "true"); s.setAttribute("spellcheck", "true");
+      s.setAttribute("aria-label", "Titre de la zone « " + txt + " » (modifiable)"); s.title = "Cliquer pour renommer";
+      h.replaceChild(s, t);
+      s.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); s.blur(); } });
+      s.addEventListener("paste", function (e) { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain").replace(/\s+/g, " ")); });
+      s.addEventListener("input", save);
+      s.addEventListener("blur", function () { if (!s.textContent.trim()) { s.textContent = txt; save(); } });
+      pzTitles.push(s);
+    });
+  }
+  function pzSet(name, hidden) {
+    var z = pzZones[name]; if (!z) return;
+    pzHide[name] = !!hidden; z.hidden = !!hidden;
+    var b = bar && bar.querySelector('[data-pz="' + name + '"]');
+    if (b) { b.textContent = (hidden ? "Afficher " : "Masquer ") + (name === "Bio" ? "la bio" : "le niveau"); b.setAttribute("aria-pressed", hidden ? "true" : "false"); }
+  }
+
   /* 5. Sauvegarde locale */
   var timer;
   function save() {
@@ -1091,7 +1117,8 @@
         j: jals.map(function (j) { return { x: parseFloat(j.style.left), l: j.querySelector(".jal-l").innerHTML, d: j.querySelector(".jal-d").innerHTML }; }),
         t: tris.map(function (i) { return i.getAttribute("data-s"); }), r: marks.map(function (b) { return b.getAttribute("data-v"); }),
         k: links.map(function (l) { return [notes.indexOf(l.a), notes.indexOf(l.b), l.t]; }),
-        g: sigs.map(function (s) { return s.get(); }) };
+        g: sigs.map(function (s) { return s.get(); }),
+        h: pzTitles.map(function (s) { return s.textContent; }), x: pzHide };
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
     }, 300);
   }
@@ -1108,6 +1135,8 @@
       if (ECO && saved.k) saved.k.forEach(function (k) { if (notes[k[0]] && notes[k[1]]) addLink(notes[k[0]], notes[k[1]], k[2]); });
       if (saved.j && jalLine) saved.j.forEach(function (d) { addJal(d); });
       if (saved.g) sigs.forEach(function (s, i) { s.set(saved.g[i]); });
+      if (saved.h && saved.h.length === pzTitles.length) pzTitles.forEach(function (s, i) { if (saved.h[i]) s.textContent = saved.h[i]; });
+      if (saved.x) Object.keys(saved.x).forEach(function (k) { pzSet(k, saved.x[k]); });
       if (saved.ph && photoEl) { photo = saved.ph; if (photo.type === "av") loadAv(renderPhoto); else renderPhoto(); }
     } catch (err) { /* rien à restaurer */ }
   }
@@ -1120,6 +1149,13 @@
     '<button type="button" data-a="clear">Tout effacer</button>' +
     '<a class="tb-link" href="' + location.pathname + '?papier" target="_blank" rel="noopener">Version papier vierge ↗</a>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
+  if (persona) ["Niveau", "Bio"].forEach(function (n) {
+    if (!pzZones[n]) return;
+    var b = mk("button"); b.type = "button"; b.setAttribute("data-pz", n);
+    bar.insertBefore(b, bar.querySelector(".tb-link"));
+    b.addEventListener("click", function () { pzSet(n, !pzHide[n]); save(); });
+    pzSet(n, !!pzHide[n]);
+  });
   document.body.insertBefore(bar, document.body.firstChild);
   var msg = bar.querySelector(".msg");
   // Consentement : sous la fiche, créer le lien (organisateur) ou envoyer le formulaire signé (participant)
