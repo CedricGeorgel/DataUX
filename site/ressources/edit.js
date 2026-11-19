@@ -623,6 +623,8 @@
     try {
       var vals = decodeFields(location.hash.slice(3));
       orgFields().forEach(function (e, i) { if (typeof vals[i] === "string") e.textContent = vals[i]; e.setAttribute("contenteditable", "false"); e.classList.add("ed-lock"); });
+      // L'étude et Vos droits ne sont pas modifiables par le participant : fond surface
+      var zs = root.querySelectorAll(".z"); [0, 1].forEach(function (i) { if (zs[i]) zs[i].classList.add("z-ro"); });
     } catch (err) { if (msg) msg.textContent = "Lien incomplet : demandez un nouveau lien à l'organisateur."; }
   }
   function remoteLink() { return location.origin + location.pathname + "#e=" + encodeFields(orgFields().map(function (e) { return e.textContent.trim(); })); }
@@ -657,7 +659,7 @@
     if (pr && pr.textContent.trim()) { var p0 = mk("p"); p0.textContent = pr.textContent.trim(); head.appendChild(p0); }
     form.appendChild(head);
     // L'étude : lignes remplies par l'organisateur
-    var s1 = sec("L'étude"), dl = mk("dl"), lastLabel = "";
+    var s1 = sec("L'étude"); s1.classList.add("mf-ro"); var dl = mk("dl"), lastLabel = "";
     z[0].querySelectorAll(".kv").forEach(function (kv) {
       var b = kv.querySelector("b"), e = kv.querySelector("[data-ed]"), v = e ? e.textContent.trim() : "";
       var lab = b ? b.textContent.trim() : ""; if (lab) lastLabel = lab;
@@ -667,7 +669,7 @@
     });
     s1.appendChild(dl);
     // Vos droits : le texte de la feuille, avec la durée de conservation remplie
-    var s2 = sec("Vos droits"), ul = mk("ul");
+    var s2 = sec("Vos droits"); s2.classList.add("mf-ro"); var ul = mk("ul");
     z[1].querySelectorAll("li").forEach(function (li) { var l = mk("li"); l.textContent = li.textContent.replace(/\s+/g, " ").trim(); ul.appendChild(l); });
     s2.appendChild(ul);
     // J'accepte : oui / non, reliés aux cases de la feuille
