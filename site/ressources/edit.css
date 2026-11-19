@@ -146,3 +146,4 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .ed-noline .pov u.ed-under>.ed{font-size:13px;line-height:20px}
 .mc .mk{font-size:14px}
 .mc td[data-calc]{vertical-align:middle}
+.ed-th{background:var(--paper,#fff)!important}

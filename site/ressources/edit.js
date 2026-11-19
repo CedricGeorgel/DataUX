@@ -365,7 +365,7 @@
   });
   var SMALL = ".fld i, .ft .d i, u, .ini i, .kv i, .tl i, .nl i, .pct, .hl2";
   root.querySelectorAll("*").forEach(function (el) {
-    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc], svg") || el.matches(".sw i, i.box[data-s]")) return;
+    if (el.hasAttribute("data-ck") || el.hasAttribute("data-ed") || el.hasAttribute("data-line") || el.closest("[data-ed], [data-line], h1, h2, [data-ck], [data-calc], svg") || el.matches(".sw i, i.box[data-s]") || (el.matches("thead tr:first-child > th:first-child") && empty(el))) return;
     if (el.matches(SMALL)) { if (empty(el)) markLine(el); return; }
     var ok = false;
     if (el.matches(".bx, .card.d, .card, .lo")) ok = !el.querySelector("[data-ck]") && (el.matches(".bx, .card.d, .lo") || empty(el));
