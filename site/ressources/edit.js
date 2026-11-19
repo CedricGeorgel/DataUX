@@ -254,7 +254,8 @@
   // Rapport de test : ✓ ~ ✗ choisis dans un menu, réussite calculée
   var marks = [], markPick = null;
   var rapport = /rapport-de-test/.test(PATH) ? rowsOf(root.querySelector("table")) : null;
-  function setMark(b, v) { b.textContent = v || ""; b.setAttribute("data-v", v || ""); b.setAttribute("aria-label", v ? "Résultat " + v + ", changer" : "Choisir un résultat"); }
+  // La valeur est dans un span : la matrice de compétences l'entoure d'un petit rond, comme sa légende
+  function setMark(b, v) { b.innerHTML = ""; if (v) { var t = mk("span"); t.textContent = v; b.appendChild(t); } b.setAttribute("data-v", v || ""); b.setAttribute("aria-label", v ? "Résultat " + v + ", changer" : "Choisir un résultat"); }
   function closeMarks() { if (markPick) { markPick.remove(); markPick = null; } }
   // Case à choix dans un menu (✓ ~ ✗ du rapport de test, niveaux 0 à 4 de la matrice de compétences)
   function pickerCell(td, opts) {
@@ -284,7 +285,8 @@
   });
   if (matrice) matrice.forEach(function (tr, ri) {
     for (var c = 1; c < tr.children.length - 1; c++) pickerCell(tr.children[c], [["0", "aucune"], ["1", "notions"], ["2", "autonome"], ["3", "confirmé"], ["4", "référent"]]);
-    if (ri === matrice.length - 1) lockCalc(tr.lastElementChild);
+    // Ligne « Besoin de l'équipe » (en haut depuis le 19/11) : sa case « Envie d'apprendre » est verrouillée
+    if (tr.classList.contains("need") || tr.querySelector(".tot")) lockCalc(tr.lastElementChild);
   });
   // États d'un écran : chaque case passe de vide à « fait », « à faire », « sans objet »
   var tris = [], TRI_S = ["", "oui", "non", "na"], TRI_L = { "": "Pas renseigné", oui: "Fait", non: "À faire", na: "Sans objet" };
