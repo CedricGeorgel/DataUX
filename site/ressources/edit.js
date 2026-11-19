@@ -289,13 +289,29 @@
   // États d'un écran : chaque case passe de vide à « fait », « à faire », « sans objet »
   var tris = [], TRI_S = ["", "oui", "non", "na"], TRI_L = { "": "Pas renseigné", oui: "Fait", non: "À faire", na: "Sans objet" };
   function setTri(i, s) { i.setAttribute("data-s", s); i.setAttribute("aria-label", TRI_L[s]); i.setAttribute("title", TRI_L[s]); }
-  if (TRI) root.querySelectorAll("i.box").forEach(function (i) {
-    i.setAttribute("role", "button"); i.setAttribute("tabindex", "0"); setTri(i, "");
-    function next() { setTri(i, TRI_S[(TRI_S.indexOf(i.getAttribute("data-s")) + 1) % 4]); save(); }
-    i.addEventListener("click", next);
-    i.addEventListener("keydown", function (e) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); next(); } });
-    tris.push(i);
-  });
+  // Un clic ouvre un menu (comme le rapport de test) au lieu de faire défiler les états
+  if (TRI) {
+    root.querySelectorAll("i.box").forEach(function (i) {
+      i.setAttribute("role", "button"); i.setAttribute("tabindex", "0"); setTri(i, "");
+      function open(e) {
+        if (e) e.stopPropagation(); closeMarks();
+        markPick = mk("div", "emo-pick mk-pick");
+        [["oui", "✓ fait"], ["non", "✗ à faire"], ["na", "— sans objet"], ["", "Effacer"]].forEach(function (o) {
+          var x = mk("button", o[0] ? "" : "clr"); x.type = "button"; x.textContent = o[1];
+          x.addEventListener("click", function () { setTri(i, o[0]); closeMarks(); save(); i.focus(); });
+          markPick.appendChild(x);
+        });
+        var r = i.getBoundingClientRect();
+        markPick.style.left = (r.left + window.scrollX) + "px"; markPick.style.top = (r.bottom + 4 + window.scrollY) + "px";
+        document.body.appendChild(markPick); markPick.querySelector("button").focus();
+      }
+      i.addEventListener("click", open);
+      i.addEventListener("keydown", function (e) { if (e.key === " " || e.key === "Enter") { e.preventDefault(); open(e); } });
+      tris.push(i);
+    });
+    document.addEventListener("click", function (e) { if (markPick && !markPick.contains(e.target)) closeMarks(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMarks(); });
+  }
   // Inventaire de l'interface : le code hexadécimal colore la pastille
   function swatches() {
     root.querySelectorAll(".sw > div").forEach(function (d) {
