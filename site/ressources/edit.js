@@ -587,12 +587,39 @@
     var kv = Array.prototype.find.call(root.querySelectorAll(".kv"), function (k) { var b = k.querySelector("b"); return b && b.textContent.trim() === label; });
     return kv ? kv.querySelector("[data-ed]") : null;
   }
+  // Tracé lissé : courbes passant par les milieux des points, avec tous les points intermédiaires du pointeur
+  function ink(cv, ctx, pt, onDown, onUp) {
+    var pts = null;
+    function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+    function add(p) {
+      var l = pts[pts.length - 1];
+      if (Math.abs(p.x - l.x) + Math.abs(p.y - l.y) < 1.2) return;
+      pts.push(p); var n = pts.length;
+      ctx.beginPath();
+      if (n === 2) { ctx.moveTo(pts[0].x, pts[0].y); var m0 = mid(pts[0], pts[1]); ctx.lineTo(m0.x, m0.y); }
+      else { var a = mid(pts[n - 3], pts[n - 2]), b = mid(pts[n - 2], pts[n - 1]); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(pts[n - 2].x, pts[n - 2].y, b.x, b.y); }
+      ctx.stroke();
+    }
+    cv.addEventListener("pointerdown", function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); var p = pt(e); pts = [p]; ctx.beginPath(); ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, 7); ctx.fill(); if (onDown) onDown(); });
+    cv.addEventListener("pointermove", function (e) {
+      if (!pts) return;
+      var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+      (evs.length ? evs : [e]).forEach(function (ev) { add(pt(ev)); });
+    });
+    function end() {
+      if (!pts) return;
+      var n = pts.length;
+      if (n > 1) { var m = mid(pts[n - 2], pts[n - 1]); ctx.beginPath(); ctx.moveTo(m.x, m.y); ctx.lineTo(pts[n - 1].x, pts[n - 1].y); ctx.stroke(); }
+      pts = null; onUp();
+    }
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  }
   function sigPad(box) {
     box.textContent = "";
     var lab = mk("span", "sig-l"); lab.textContent = "Signature"; box.appendChild(lab);
     var cv = mk("canvas", "sig-c"); cv.setAttribute("aria-label", "Zone de signature : signez au doigt ou à la souris"); box.appendChild(cv);
     var clr = mk("button", "sig-x"); clr.type = "button"; clr.textContent = "Effacer"; box.appendChild(clr);
-    var ctx, data = "", last = null, W = 0, H = 0;
+    var ctx, data = "", W = 0, H = 0;
     W = cv.clientWidth; H = cv.clientHeight; cv.width = W * 2; cv.height = H * 2;
     ctx = cv.getContext("2d"); ctx.scale(2, 2); ctx.lineWidth = 1.6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141414";
     function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
@@ -600,10 +627,7 @@
       var z = box.closest(".z"), d = z && z.querySelectorAll(".kv [data-ed]")[1];
       if (d && !d.textContent.trim()) { var t = new Date(); d.textContent = ("0" + t.getDate()).slice(-2) + "/" + ("0" + (t.getMonth() + 1)).slice(-2) + "/" + t.getFullYear(); }
     }
-    cv.addEventListener("pointerdown", function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); last = pt(e); ctx.beginPath(); ctx.arc(last.x, last.y, .6, 0, 7); ctx.fill(); stampDate(); });
-    cv.addEventListener("pointermove", function (e) { if (!last) return; var p = pt(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; });
-    function end() { if (!last) return; last = null; data = cv.toDataURL("image/png"); save(); }
-    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    ink(cv, ctx, pt, stampDate, function () { data = cv.toDataURL("image/png"); save(); });
     clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); data = ""; save(); });
     return {
       get: function () { return data; },
@@ -706,21 +730,17 @@
     function fit() { var k = wrap.clientWidth / 1123; root.style.transform = "scale(" + k + ")"; wrap.style.height = (794 * k) + "px"; }
     fit(); window.addEventListener("resize", fit);
     // Le pavé de signature
-    var W = pad.clientWidth, H = 170, ctx, last = null;
+    var W = pad.clientWidth, H = 170, ctx;
     cv.width = W * 2; cv.height = H * 2; cv.style.height = H + "px"; ctx = cv.getContext("2d"); ctx.scale(2, 2);
     ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141414";
     var existing = sigs[0] && sigs[0].get();
     if (existing) { var im0 = new Image(); im0.onload = function () { var k = Math.min(W / im0.width, H / im0.height); ctx.drawImage(im0, (W - im0.width * k) / 2, (H - im0.height * k) / 2, im0.width * k, im0.height * k); }; im0.src = existing; }
     function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
-    cv.addEventListener("pointerdown", function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); last = pt(e); ctx.beginPath(); ctx.arc(last.x, last.y, .8, 0, 7); ctx.fill(); });
-    cv.addEventListener("pointermove", function (e) { if (!last) return; var p = pt(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; });
-    function end() {
-      if (!last) return; last = null;
+    ink(cv, ctx, pt, null, function () {
       var d = z[3].querySelectorAll(".kv [data-ed]")[1];
       if (d && !d.textContent.trim()) { var t2 = new Date(); d.textContent = ("0" + t2.getDate()).slice(-2) + "/" + ("0" + (t2.getMonth() + 1)).slice(-2) + "/" + t2.getFullYear(); }
       if (sigs[0]) sigs[0].set(cv.toDataURL("image/png")); save();
-    }
-    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    });
     clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); if (sigs[0]) sigs[0].set(""); save(); });
     send.addEventListener("click", function () {
       if (!inp.value.trim()) { note.textContent = "Écrivez votre nom avant d'envoyer."; inp.focus(); return; }
