@@ -274,7 +274,8 @@
       document.body.appendChild(markPick); markPick.querySelector("button").focus();
     });
   }
-  var matrice = /matrice-de-competences/.test(PATH) ? rowsOf(root.querySelector(".mc table")) : null;
+  // Toutes les lignes à cases (la ligne « Besoin de l'équipe » est dans l'en-tête, tout en haut)
+  var matrice = /matrice-de-competences/.test(PATH) ? Array.prototype.filter.call(root.querySelectorAll(".mc table tr"), function (tr) { return tr.querySelector("td"); }) : null;
   if (rapport || matrice) {
     document.addEventListener("click", function (e) { if (markPick && !markPick.contains(e.target)) closeMarks(); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMarks(); });
