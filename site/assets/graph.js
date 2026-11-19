@@ -386,7 +386,8 @@ function init(G) {
   function renderPanel() {
     if (!panel) return;
     if (!state.focus && state.panel === "res") {
-      const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || a.localeCompare(b, "fr"));
+      const ord = G.resThemes || [], rank = k => { const i = ord.indexOf(k); return i < 0 ? ord.length : i; };
+      const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || rank(a) - rank(b) || a.localeCompare(b, "fr"));
       panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
         <h1 style="margin-top:12px">Ressources</h1>
         ${kinds.map(k => { const rs = RES.filter(r => (r.kind || "Autres") === k);

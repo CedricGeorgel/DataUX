@@ -24,7 +24,7 @@ export const IGNORE = ["Contributeur", "Contributeurs"];
 
 // Ressources (templates à imprimer) : hors carte, listées dans l'encart « Ressources ».
 // Seules les ressources dont le lien est rempli sont publiées (les autres ne sont pas encore validées).
-export const RESSOURCES = { label: "Ressources", database: "06e859364cd64d47a5377d9dcd79fb3a", source: "54c216cf-c187-4f7c-a604-55ae7584eb84", lien: "Lien éditable", type: "Type" };
+export const RESSOURCES = { label: "Ressources", database: "06e859364cd64d47a5377d9dcd79fb3a", source: "54c216cf-c187-4f7c-a604-55ae7584eb84", lien: "Lien éditable", type: "Thème" };
 
 // Contributeurs : affichés en bas de chaque fiche (relation « Contributeur » vers cette base)
 export const CONTRIB_PROPERTY = "Contributeur";

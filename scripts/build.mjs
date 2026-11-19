@@ -386,8 +386,14 @@ const graph = {
 };
 // Ressources validées (lien rempli) : liste à part, reliée aux fiches par leurs relations
 const ressources = [];
+let resThemes = []; // ordre des thèmes = ordre des options dans Notion
 try {
   const src = await sourceId(RESSOURCES);
+  try {
+    const ds = await notion("GET", `/data_sources/${src}`);
+    const tp = (ds.properties || {})[RESSOURCES.type];
+    if (tp && tp.select) resThemes = (tp.select.options || []).map(o => o.name);
+  } catch (e) { console.warn("Thèmes des ressources illisibles :", e.message); }
   let cursor = null;
   do {
     const body = { page_size: 100 }; if (cursor) body.start_cursor = cursor;
@@ -422,6 +428,7 @@ const pubGraph = {
     .filter(p => p.fiches.length).sort((a, b) => b.fiches.length - a.fiches.length || a.name.localeCompare(b.name, "fr")),
   ressources: ressources.map(r => ({ id: pub(r.id), name: r.name, kind: r.kind, url: r.url, liees: r.liees.map(pub) }))
     .sort((a, b) => a.name.localeCompare(b.name, "fr")),
+  resThemes,
 };
 await fs.writeFile(path.join(OUT, "graph.json"), JSON.stringify(pubGraph));
 console.log(`Graphe : ${list.length} fiches, ${E.length} liens, ${graph.conf.length} confusions, ${comms.length} groupes`);
