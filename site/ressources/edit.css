@@ -148,3 +148,18 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .mc td[data-calc]{vertical-align:middle}
 .ed-th{background:var(--paper,#fff)!important}
 .mc .mk span{display:inline-flex;width:20px;height:20px;border:1px solid var(--line-strong,#8f867e);border-radius:50%;align-items:center;justify-content:center;font-size:11px;line-height:1}
+
+/* Formulaire de consentement : signatures et lien à distance */
+.sig{position:relative}
+.sig-l{position:absolute;top:5px;left:7px;pointer-events:none}
+.sig-c{position:absolute;left:0;right:0;bottom:0;top:18px;width:100%;height:calc(100% - 18px);touch-action:none;cursor:crosshair}
+.sig-x{position:absolute;top:3px;right:5px;font:11px/1.2 'Cactus Classical Serif',Georgia,serif;text-transform:none;letter-spacing:0;border:0;background:none;color:#8f867e;cursor:pointer;padding:0}
+.sig-x:hover{color:#141414}
+.sig-off{display:flex;align-items:center;justify-content:center;text-align:center;text-transform:none!important;letter-spacing:0!important;font-size:10px;color:#8f867e;background:var(--surface,#f7f4f1)}
+.ed-lock{cursor:default}
+.tb-below.consent{flex-direction:column;align-items:center;gap:10px}
+.consent-intro{margin:0;max-width:640px;text-align:center;font:14px/1.45 'Cactus Classical Serif',Georgia,serif;color:#141414}
+.consent-note{margin:0;min-height:18px;font:13px/1.4 'Cactus Classical Serif',Georgia,serif;color:#555;text-align:center;max-width:640px}
+.lnk input{width:min(640px,88vw);box-sizing:border-box;font:12px/1.3 ui-monospace,Menlo,monospace;padding:7px 9px;border:1px solid #c9c2bb;border-radius:3px;background:#fff;color:#141414}
+.capturing .sig-x{visibility:hidden}
+@media print{.sig-x{visibility:hidden}.tb-below.consent{display:none}}

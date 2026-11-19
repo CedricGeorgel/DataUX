@@ -7,6 +7,8 @@
   var root = document.querySelector(".root");
   if (!root) return;
   var KEY = "dataux-fiche:" + location.pathname;
+  // Consentement signé à distance : la saisie du participant est gardée à part de celle de l'organisateur
+  if (/^#e=/.test(location.hash)) KEY += ":distance:" + location.hash.slice(3, 40);
   var NB = /[\s ​]/g;
   var eds = [], checks = [], tlLines = [];
 
@@ -446,7 +448,9 @@
     root.style.position = "relative";
     setupEmos();
     setupJals();
+    setupConsent();
     restore();
+    if (REMOTE) applyRemote();
     recalc();
   });
 
@@ -559,6 +563,85 @@
     if (!linkStart) { linkStart = n; n.classList.add("pi-sel"); return; }
     var a = linkStart; a.classList.remove("pi-sel"); linkStart = null;
     if (a !== n && !links.some(function (l) { return (l.a === a && l.b === n) || (l.a === n && l.b === a); })) { addLink(a, n, 0); save(); }
+  }
+
+  /* Formulaire de consentement : trois usages.
+     1. Imprimer : rien de spécial, on signe à la main.
+     2. Sur place : participant et organisateur signent au doigt ou à la souris, puis image ou impression.
+     3. À distance : l'organisateur remplit « L'étude » et « Vos droits », crée un lien (les champs voyagent
+        dans l'adresse, après le #, jamais envoyés au serveur). Le participant coche, signe et renvoie l'image. */
+  var CONSENT = /formulaire-de-consentement/.test(PATH);
+  var REMOTE = CONSENT && /^#e=/.test(location.hash);
+  var sigs = [];
+  function consentZones() { return root.querySelectorAll(".z"); }
+  // Champs remplis par l'organisateur : en-tête, « L'étude », « Vos droits », nom de l'organisateur
+  function orgFields() {
+    var z = consentZones(), list = Array.prototype.slice.call(root.querySelectorAll(".fld [data-ed]"));
+    [0, 1].forEach(function (k) { if (z[k]) list = list.concat(Array.prototype.slice.call(z[k].querySelectorAll("[data-ed]"))); });
+    if (z[4]) { var n = z[4].querySelector(".kv [data-ed]"); if (n) list.push(n); }
+    return list;
+  }
+  function kvField(label) {
+    var kv = Array.prototype.find.call(root.querySelectorAll(".kv"), function (k) { var b = k.querySelector("b"); return b && b.textContent.trim() === label; });
+    return kv ? kv.querySelector("[data-ed]") : null;
+  }
+  function sigPad(box) {
+    box.textContent = "";
+    var lab = mk("span", "sig-l"); lab.textContent = "Signature"; box.appendChild(lab);
+    var cv = mk("canvas", "sig-c"); cv.setAttribute("aria-label", "Zone de signature : signez au doigt ou à la souris"); box.appendChild(cv);
+    var clr = mk("button", "sig-x"); clr.type = "button"; clr.textContent = "Effacer"; box.appendChild(clr);
+    var ctx, data = "", last = null, W = 0, H = 0;
+    W = cv.clientWidth; H = cv.clientHeight; cv.width = W * 2; cv.height = H * 2;
+    ctx = cv.getContext("2d"); ctx.scale(2, 2); ctx.lineWidth = 1.6; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#141414";
+    function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+    function stampDate() {
+      var z = box.closest(".z"), d = z && z.querySelectorAll(".kv [data-ed]")[1];
+      if (d && !d.textContent.trim()) { var t = new Date(); d.textContent = ("0" + t.getDate()).slice(-2) + "/" + ("0" + (t.getMonth() + 1)).slice(-2) + "/" + t.getFullYear(); }
+    }
+    cv.addEventListener("pointerdown", function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); last = pt(e); ctx.beginPath(); ctx.arc(last.x, last.y, .6, 0, 7); ctx.fill(); stampDate(); });
+    cv.addEventListener("pointermove", function (e) { if (!last) return; var p = pt(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; });
+    function end() { if (!last) return; last = null; data = cv.toDataURL("image/png"); save(); }
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    clr.addEventListener("click", function () { ctx.clearRect(0, 0, W, H); data = ""; save(); });
+    return {
+      get: function () { return data; },
+      set: function (url) { ctx.clearRect(0, 0, W, H); data = url || ""; if (!data) return; var im = new Image(); im.onload = function () { ctx.drawImage(im, 0, 0, W, H); }; im.src = data; }
+    };
+  }
+  function setupConsent() {
+    if (!CONSENT) return;
+    root.querySelectorAll(".sig").forEach(function (box, i) {
+      if (REMOTE && i === 1) { box.classList.add("sig-off"); box.textContent = "Signature de l'organisateur non requise pour un consentement à distance"; return; }
+      sigs.push(sigPad(box));
+    });
+  }
+  function encodeFields(vals) { return btoa(unescape(encodeURIComponent(JSON.stringify(vals)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  function decodeFields(s) { return JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))))); }
+  function applyRemote() {
+    try {
+      var vals = decodeFields(location.hash.slice(3));
+      orgFields().forEach(function (e, i) { if (typeof vals[i] === "string") e.textContent = vals[i]; e.setAttribute("contenteditable", "false"); e.classList.add("ed-lock"); });
+    } catch (err) { if (msg) msg.textContent = "Lien incomplet : demandez un nouveau lien à l'organisateur."; }
+  }
+  function remoteLink() { return location.origin + location.pathname + "#e=" + encodeFields(orgFields().map(function (e) { return e.textContent.trim(); })); }
+  function sendSigned(btn, note) {
+    if (!sigs[0] || !sigs[0].get()) { note.textContent = "Signez dans le cadre « Participant » avant d'envoyer."; return; }
+    if (!window.htmlToImage) { note.textContent = "Envoi indisponible : utilisez « Imprimer / PDF »."; return; }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    btn.disabled = true; note.textContent = "Préparation de l'image…";
+    document.documentElement.classList.add("capturing");
+    var c = kvField("Contact"), contact = c ? c.textContent.trim() : "";
+    window.htmlToImage.toBlob(root, { pixelRatio: 2, backgroundColor: "#ffffff", style: { margin: "0", outline: "0" } }).then(function (blob) {
+      var file = new File([blob], "consentement-signe.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        return navigator.share({ files: [file], title: "Formulaire de consentement signé" }).then(function () { note.textContent = "Formulaire envoyé. Merci !"; });
+      }
+      var a = mk("a"); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+      note.textContent = "Image enregistrée. Joignez-la à un e-mail" + (contact ? " à : " + contact : " à l'organisateur") + ".";
+    }).catch(function (err) {
+      if (err && err.name === "AbortError") { note.textContent = ""; return; }
+      note.textContent = "L'image n'a pas pu être créée. Essayez « Imprimer / PDF ».";
+    }).then(function () { btn.disabled = false; document.documentElement.classList.remove("capturing"); });
   }
 
   /* 4 ter. Photo du persona : import d'une image ou avatar généré (DiceBear Notionists, CC0) */
@@ -696,7 +779,8 @@
         ph: photo,
         j: jals.map(function (j) { return { x: parseFloat(j.style.left), l: j.querySelector(".jal-l").innerHTML, d: j.querySelector(".jal-d").innerHTML }; }),
         t: tris.map(function (i) { return i.getAttribute("data-s"); }), r: marks.map(function (b) { return b.getAttribute("data-v"); }),
-        k: links.map(function (l) { return [notes.indexOf(l.a), notes.indexOf(l.b), l.t]; }) };
+        k: links.map(function (l) { return [notes.indexOf(l.a), notes.indexOf(l.b), l.t]; }),
+        g: sigs.map(function (s) { return s.get(); }) };
       try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
     }, 300);
   }
@@ -712,6 +796,7 @@
       if (saved.r && saved.r.length === marks.length) marks.forEach(function (b, n) { setMark(b, saved.r[n]); });
       if (ECO && saved.k) saved.k.forEach(function (k) { if (notes[k[0]] && notes[k[1]]) addLink(notes[k[0]], notes[k[1]], k[2]); });
       if (saved.j && jalLine) saved.j.forEach(function (d) { addJal(d); });
+      if (saved.g) sigs.forEach(function (s, i) { s.set(saved.g[i]); });
       if (saved.ph && photoEl) { photo = saved.ph; if (photo.type === "av") loadAv(renderPhoto); else renderPhoto(); }
     } catch (err) { /* rien à restaurer */ }
   }
@@ -725,6 +810,29 @@
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
   document.body.insertBefore(bar, document.body.firstChild);
   var msg = bar.querySelector(".msg");
+  // Consentement : sous la fiche, créer le lien (organisateur) ou envoyer le formulaire signé (participant)
+  if (CONSENT) {
+    var cb = mk("div", "tb-below consent"), note = mk("p", "consent-note"), go = mk("button", "btn-note");
+    go.type = "button"; note.setAttribute("role", "status");
+    if (REMOTE) {
+      var intro = mk("p", "consent-intro");
+      intro.textContent = "Lisez le formulaire, cochez vos choix, écrivez votre nom et signez dans le cadre « Participant ». Puis envoyez-le.";
+      cb.appendChild(intro);
+      go.textContent = "Envoyer le formulaire signé";
+      go.addEventListener("click", function () { sendSigned(go, note); });
+    } else {
+      go.textContent = "Créer le lien pour signer à distance";
+      go.addEventListener("click", function () {
+        var url = remoteLink(), box = cb.querySelector(".lnk");
+        if (!box) { box = mk("div", "lnk"); var inp = mk("input"); inp.type = "text"; inp.readOnly = true; inp.setAttribute("aria-label", "Lien à envoyer au participant"); box.appendChild(inp); cb.insertBefore(box, note); }
+        var input = box.querySelector("input"); input.value = url; input.focus(); input.select();
+        var done = function () { note.textContent = "Lien copié. Envoyez-le au participant : il cochera, signera et vous renverra l'image."; };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { note.textContent = "Copiez le lien ci-dessus et envoyez-le au participant."; });
+        else note.textContent = "Copiez le lien ci-dessus et envoyez-le au participant.";
+      });
+    }
+    cb.appendChild(go); cb.appendChild(note); root.parentNode.insertBefore(cb, root.nextSibling);
+  }
   // Bouton post-it : sous la fiche, à part des autres
   if (NOTES) {
     var below = mk("div", "tb-below"), nb = mk("button", "btn-note");
