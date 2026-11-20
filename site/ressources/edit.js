@@ -1146,11 +1146,14 @@
   /* 6. Barre d'outils */
   var slug = location.pathname.split("/").pop().replace(/\.html$/, "") || "fiche";
   var bar = mk("div", "tb");
-  bar.innerHTML = '<button type="button" data-a="png">Enregistrer en image</button>' +
-    '<button type="button" data-a="print">Imprimer / PDF</button>' +
-    '<button type="button" data-a="save" title="Télécharger un fichier .dataux avec tout ce qui est saisi">Sauvegarder</button>' +
+  bar.innerHTML = '<button type="button" data-a="save" title="Télécharger un fichier .dataux avec tout ce qui est saisi">Sauvegarder</button>' +
     '<button type="button" data-a="open" title="Reprendre une fiche à partir d\'un fichier .dataux">Ouvrir</button>' +
+    '<span class="tb-gap" aria-hidden="true"></span>' +
+    '<button type="button" data-a="png">Enregistrer en image</button>' +
+    '<button type="button" data-a="print">Imprimer / PDF</button>' +
+    '<span class="tb-gap" aria-hidden="true"></span>' +
     '<button type="button" data-a="clear">Tout effacer</button>' +
+    '<span class="tb-gap" aria-hidden="true"></span>' +
     '<a class="tb-link" href="' + location.pathname + '?papier" target="_blank" rel="noopener">Version papier vierge ↗</a>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
   // Persona : boutons sous la fiche, comme le bouton post-it

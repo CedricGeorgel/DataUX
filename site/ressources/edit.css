@@ -229,3 +229,4 @@ td.calc{display:table-cell!important;margin-top:0!important}
 .pz .col:first-child .z .lo>.ed{height:100%!important}
 .pz .z[hidden]{display:none}
 .pz-below{gap:10px;flex-wrap:wrap}
+.tb .tb-gap{width:16px;flex:none}
