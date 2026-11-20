@@ -1208,11 +1208,11 @@
       location.reload();
     } else if (a === "png") exportPng(b);
     else if (a === "save") saveFile();
-    else if (a === "open") picker.click();
+    else if (a === "open") filePick.click();
   });
   /* 7. Sauvegarde dans un fichier .dataux (JSON) : à garder sur son ordinateur, à rouvrir plus tard ou ailleurs */
-  var picker = mk("input"); picker.type = "file"; picker.accept = ".dataux,.json,application/json"; picker.hidden = true;
-  document.body.appendChild(picker);
+  var filePick = mk("input"); filePick.type = "file"; filePick.accept = ".dataux,.json,application/json"; filePick.hidden = true;
+  document.body.appendChild(filePick);
   function saveFile() {
     var now = new Date(), day = now.toISOString().slice(0, 10);
     var file = { format: "dataux-fiche", version: 1, fiche: slug, titre: (root.querySelector("h1") || {}).textContent || slug,
@@ -1223,8 +1223,8 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     msg.textContent = "Fichier enregistré dans vos téléchargements";
   }
-  picker.addEventListener("change", function () {
-    var f = picker.files && picker.files[0]; picker.value = ""; if (!f) return;
+  filePick.addEventListener("change", function () {
+    var f = filePick.files && filePick.files[0]; filePick.value = ""; if (!f) return;
     var r = new FileReader();
     r.onload = function () {
       var file;
