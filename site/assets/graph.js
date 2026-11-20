@@ -4,6 +4,9 @@
 "use strict";
 const MODE = document.body.dataset.mode || "full";
 const FULL = MODE === "full";
+// Carte intégrée à la page des fiches (embed.html?iso) : toujours isolée sur une fiche, sans moyen d'en sortir
+const LOCK = !FULL && new URLSearchParams(location.search).has("iso");
+if (LOCK) document.body.classList.add("lock");
 const API_GRAPH = "data/graph.json";
 const API_FICHE = id => "data/fiches/" + id + ".json";
 const BIG = "index.html";
@@ -90,7 +93,7 @@ function init(G) {
   }
   // Glossaire et bibliographie masqués au départ : ce sont des fiches de référence, pas des notions à explorer
   const HIDDEN = ["glossaire", "biblio"];
-  const state = { ring: false, types: new Set(typeKeys.filter(t => !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null, panel: null };
+  const state = { ring: false, types: new Set(typeKeys.filter(t => LOCK || !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null, panel: null };
   const color = n => TYPES[n.type].color;
   // Une forme par base, en plus de la couleur (lisible sans la couleur). Les deux plus grosses bases restent rondes ou presque.
   const SHAPE = { biais: "circle", glossaire: "square", kpi: "diamond", loi: "triangle", methode: "hexagon", framework: "pentagon", acteur: "tridown", biblio: "book" };
@@ -164,12 +167,6 @@ function init(G) {
     sugBtn.onclick = () => { state.showSug = !state.showSug; sugLabel(); state.focus ? select(state.focus, false, state.ring) : update(); };
     const dl = $("names");
     G.nodes.slice().sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(n => { const o = document.createElement("option"); o.value = n.name; dl.appendChild(o); });
-    $("listBtn").onclick = () => {
-      if (state.focus) select(null);
-      state.panel = "list";
-      if (document.body.classList.contains("nopanel")) $("panelBtn").click(); else renderPanel();
-      const q = $("listQ"); if (q && !MOB()) q.focus({ preventScroll: true });
-    };
     $("q").addEventListener("change", e => {
       const v = e.target.value.trim().toLowerCase(); if (!v) return;
       const n = G.nodes.find(x => x.name.toLowerCase() === v) || G.nodes.find(x => x.name.toLowerCase().includes(v));
@@ -184,7 +181,7 @@ function init(G) {
 
   // ---------- Bouton « Ouvrir en grand » (page nuage seul)
   let bigLink = null;
-  if (!FULL) {
+  if (!FULL && !LOCK) {
     bigLink = document.createElement("a"); bigLink.className = "btn open-big"; bigLink.target = "_blank"; bigLink.rel = "noopener";
     bigLink.href = BIG; bigLink.textContent = "Ouvrir en grand ↗"; document.body.appendChild(bigLink);
     const hint = document.createElement("div"); hint.className = "hint"; hint.textContent = "Clic : voir les liens · Double clic : isoler la fiche"; document.body.appendChild(hint);
@@ -196,7 +193,9 @@ function init(G) {
   const gEdges = root.append("g"), gNodes = root.append("g");
   const zoom = d3.zoom().scaleExtent([.15, 5]).on("zoom", e => { root.attr("transform", e.transform); labelVis(e.transform.k); edgeVis(e.transform.k); });
   svg.call(zoom).on("dblclick.zoom", null);
-  svg.on("click", e => { if (e.target === svg.node()) select(null); });
+  svg.on("click", e => { if (e.target === svg.node() && !LOCK) select(null); });
+  // Mode verrouillé : ouvrir un point l'isole à son tour et prévient la page des fiches
+  const pick = id => { select(id, false, true); history.replaceState(null, "", "?iso#" + id); if (window.parent !== window) window.parent.postMessage({ dataux: "fiche", id }, location.origin); };
 
   // ---------- Disposition par groupes (Louvain calculé par le serveur)
   const C = G.comms;
@@ -256,12 +255,12 @@ function init(G) {
       g.append("path").attr("class", "mk").attr("d", markD);
       g.append("text").attr("dy", d => -rad(d) - 4).attr("text-anchor", "middle").text(d => d.name);
       g.append("title").text(d => `${d.name} · ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
-      g.on("click", (e, d) => { e.stopPropagation(); if (state.focus !== d.id || state.ring) select(d.id); })
-       .on("dblclick", (e, d) => { e.stopPropagation(); e.preventDefault(); select(d.id, false, true); })
+      g.on("click", (e, d) => { e.stopPropagation(); if (LOCK) { if (state.focus !== d.id) pick(d.id); } else if (state.focus !== d.id || state.ring) select(d.id); })
+       .on("dblclick", (e, d) => { e.stopPropagation(); e.preventDefault(); if (LOCK) { if (state.focus !== d.id) pick(d.id); } else select(d.id, false, true); })
        .on("focus", (e, d) => setRov(d.id))
-       .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.id, false, e.shiftKey); }
+       .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (LOCK) pick(d.id); else select(d.id, false, e.shiftKey); }
          else if (DIRS[e.key]) { e.preventDefault(); moveFocus(d, DIRS[e.key]); }
-         else if (e.key === "Escape" && state.focus) { e.preventDefault(); select(null); } })
+         else if (e.key === "Escape" && state.focus && !LOCK) { e.preventDefault(); select(null); } })
        .call(d3.drag().on("start", (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
          .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); if (!d.ring) { d.fx = null; d.fy = null; } }));
       return g;
@@ -431,26 +430,7 @@ function init(G) {
     return `<button class="theme" role="switch" aria-checked="${d}" data-theme-switch><span class="trk" aria-hidden="true"></span>Mode sombre</button>`; };
   function renderPanel() {
     if (!panel) return;
-    if (panel.dataset.view === "list") state.listScroll = panel.scrollTop;
-    panel.dataset.view = !state.focus && state.panel === "list" ? "list" : "";
-    if (!state.focus && state.panel === "list") {
-      // Toutes les fiches, par base et par ordre alphabétique, avec un filtre (alternative à la carte)
-      const groups = typeKeys.map(t => [t, G.nodes.filter(n => n.type === t).sort((a, b) => a.name.localeCompare(b.name, "fr"))]).filter(([, a]) => a.length);
-      panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
-        <h1 style="margin-top:12px">Toutes les fiches</h1>
-        <label class="lfilt">Filtrer la liste<input type="search" id="listQ" autocomplete="off" value="${esc(state.listQ || "")}"></label>
-        <p class="muted" id="listN" role="status"></p>
-        ${groups.map(([t, a]) => `<section class="lgrp"><h3>${esc(TYPES[t].label)} · <span>${a.length}</span></h3><ul class="links">${a.map(n => item(n)).join("")}</ul></section>`).join("")}
-        <div class="pfoot">${themeSwitch()}</div>`;
-      const q = $("listQ");
-      const run = () => { state.listQ = q.value; const v = fold(q.value.trim()); let tot = 0;
-        panel.querySelectorAll(".lgrp").forEach(g => { let c = 0;
-          g.querySelectorAll("li").forEach(li => { const ok = !v || fold(li.textContent).includes(v); li.hidden = !ok; if (ok) c++; });
-          g.hidden = !c; g.querySelector("h3 span").textContent = c; tot += c; });
-        $("listN").textContent = tot ? tot + " fiche" + (tot > 1 ? "s" : "") : "Aucune fiche ne correspond."; };
-      q.oninput = run; run();
-      panel.scrollTop = state.listScroll || 0;
-    } else if (!state.focus && state.panel === "res") {
+    if (!state.focus && state.panel === "res") {
       const ord = G.resThemes || [], rank = k => { const i = ord.indexOf(k); return i < 0 ? ord.length : i; };
       const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || rank(a) - rank(b) || a.localeCompare(b, "fr"));
       panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
@@ -460,7 +440,7 @@ function init(G) {
         <div class="pfoot">${themeSwitch()}</div>`;
     } else if (state.focus) { const n = byId.get(state.focus);
       const groups = {}; [...n.nb].map(i => byId.get(i)).forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
-      let h = `<button class="lnk back" data-back="1">← ${state.panel === "list" ? "Toutes les fiches" : state.panel === "res" ? "Ressources" : "Vue d'ensemble"}</button>
+      let h = `<button class="lnk back" data-back="1">← ${state.panel === "res" ? "Ressources" : "Vue d'ensemble"}</button>
         <h1 style="margin-top:12px">${esc(n.name)}</h1>
         <p><span class="tag" style="border-color:${color(n)}">${esc(TYPES[n.type].label)}</span>${n.cat ? `<span class="tag">${esc(n.cat)}</span>` : ""}</p>
         <h2>${n.deg} lien${n.deg > 1 ? "s" : ""}</h2>`;
@@ -474,7 +454,7 @@ function init(G) {
       const when = new Date(G.generated).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
       panel.innerHTML = grab() + `<h1>Réseau des fiches</h1>
         <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
-        <p><button class="lnk" data-list="1">Voir les ${G.nodes.length} fiches en liste →</button></p>
+        <p><a class="lnk" href="fiches.html">Voir les ${G.nodes.length} fiches en cartes →</a></p>
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
@@ -485,7 +465,6 @@ function init(G) {
         </div>`;
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
-    panel.querySelectorAll("[data-list]").forEach(b => b.onclick = () => $("listBtn").click());
     panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
     panel.querySelectorAll("[data-res]").forEach(b => b.onclick = () => showRes(b.dataset.res));
     const bk = panel.querySelector("[data-back]"); if (bk) bk.onclick = () => { if (state.panel && !state.focus) { state.panel = null; renderPanel(); } else select(null); };
@@ -716,9 +695,9 @@ function init(G) {
   linkCap = .05;
   sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
-  addEventListener("resize", () => { fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 0); });
+  addEventListener("resize", () => { fitBar(); if (LOCK && state.focus) select(state.focus, false, true); else if (!state.focus) fitNodes(visNodes, 1.2, 0); });
   const deep = fromHash(location.hash.slice(1));
-  if (deep) select(deep, true);
-  addEventListener("hashchange", () => { const d = fromHash(location.hash.slice(1)); if (d && d !== state.focus) select(d, true); });
+  if (deep) select(deep, true, LOCK);
+  addEventListener("hashchange", () => { const d = fromHash(location.hash.slice(1)); if (d && d !== state.focus) select(d, true, LOCK); });
 }
 })();

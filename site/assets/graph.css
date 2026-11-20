@@ -320,9 +320,6 @@ aside .btn:hover,.win .btn:hover,.bar:not(.inline) .pop .chip:hover{background:c
   .grab{background:none}
   .tag,.bar:not(.inline) .pop .chip,aside .btn,.win .btn{background:color-mix(in srgb,var(--surface) 70%,transparent)}
 }
-/* Vue Liste (20/11/2026) et clavier */
-.lfilt{display:flex;flex-direction:column;gap:4px;margin:10px 0 2px;font-size:12px;color:var(--text-muted)}
-.lfilt input{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink)}
-.lfilt input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.lgrp[hidden],ul.links li[hidden]{display:none}
+/* Clavier (20/11/2026) */
 .node:focus-visible text{display:inline!important}
+a.btn#listBtn{text-decoration:none;color:var(--ink)}

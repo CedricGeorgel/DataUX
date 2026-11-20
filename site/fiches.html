@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toutes les fiches · DataUX</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/fiches.css">
+</head>
+<body>
+<header class="fh">
+  <a class="back" href="./">← Carte</a>
+  <h1>Toutes les fiches</h1>
+  <label class="q"><span class="sr">Filtrer les fiches</span><input id="q" type="search" placeholder="Filtrer les fiches…" autocomplete="off"></label>
+  <div class="chips" id="chips" role="group" aria-label="Bases"></div>
+  <p class="n" id="n" role="status"></p>
+</header>
+<main id="grid" class="grid" aria-label="Fiches"></main>
+<section id="split" class="split" hidden>
+  <article class="fiche" id="fiche" aria-live="polite"></article>
+  <div class="map"><iframe id="map" title="Carte de la fiche et de ses liens"></iframe></div>
+</section>
+<script src="assets/fiches.js"></script>
+</body>
+</html>
