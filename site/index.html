@@ -7,13 +7,13 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <link rel="stylesheet" href="assets/tokens.css">
-<link rel="stylesheet" href="assets/nav.css">
+<link rel="stylesheet" href="assets/ui.css">
 <link rel="stylesheet" href="assets/graph.css">
 </head>
 <body data-mode="full">
 <nav class="views" aria-label="Vues"><a href="./" aria-current="page">Carte</a><a href="fiches.html">Liste</a><a href="ressources.html">Ressources</a></nav>
 <div class="bar">
-  <input id="q" type="search" placeholder="Chercher une fiche…" aria-label="Chercher une fiche" list="names">
+  <input id="q" class="search" type="search" placeholder="Chercher une fiche…" aria-label="Chercher une fiche" list="names">
   <datalist id="names"></datalist>
   <div class="fwrap">
     <button class="btn" id="filterBtn" aria-expanded="false" aria-controls="filters">Filtres <span id="fcount" class="muted"></span> ▾</button>

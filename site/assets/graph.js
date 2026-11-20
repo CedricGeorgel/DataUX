@@ -7,17 +7,12 @@ const FULL = MODE === "full";
 // Carte intégrée à la page des fiches (embed.html?iso) : toujours isolée sur une fiche, sans moyen d'en sortir
 const LOCK = !FULL && new URLSearchParams(location.search).has("iso");
 if (LOCK) document.body.classList.add("lock");
-const API_GRAPH = "data/graph.json";
-const API_FICHE = id => "data/fiches/" + id + ".json";
 const BIG = "index.html";
 const $ = id => document.getElementById(id);
 // Briques communes aux pages (commun.js) : texte, adresses lisibles, formes, contenu des fiches
 const U = window.DataUX, esc = U.esc;
-const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
-                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
-// Thème choisi dans le panneau (clair ou sombre). Sans choix, le site suit le réglage de l'appareil.
-const savedTheme = store.get("reseau-theme");
-if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+const store = U.store;
+// Thème : appliqué au chargement par commun.js ; l'interrupteur du panneau le change
 const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
 
 // ---------------------------------------------------------------- Écrans de chargement, d'erreur et de premier lancement
@@ -31,12 +26,14 @@ function showError(msg) {
 }
 async function start() {
   showLoading();
-  let r, j;
-  try { r = await fetch(API_GRAPH, { cache: "no-cache" }); }
-  catch (e) { return showError("Le site ne répond pas. Vérifie ta connexion, puis réessaie."); }
-  if (r.status === 404) return showError("Les données ne sont pas encore publiées. Elles arrivent à la prochaine mise à jour.");
-  try { j = await r.json(); } catch (e) { j = null; }
-  if (!r.ok || !j || !j.nodes) return showError("Les données sont illisibles (erreur " + r.status + ").");
+  let j;
+  try { j = await U.loadGraph(); }
+  catch (e) {
+    if (e === 404) return showError("Les données ne sont pas encore publiées. Elles arrivent à la prochaine mise à jour.");
+    if (typeof e === "number") return showError("Les données sont illisibles (erreur " + e + ").");
+    return showError("Le site ne répond pas. Vérifie ta connexion, puis réessaie.");
+  }
+  if (!j || !j.nodes) return showError("Les données sont illisibles.");
   init(j);
   hideScreen();
 }
@@ -528,7 +525,7 @@ function init(G) {
   const win = FULL ? $("win") : document.createElement("div");
   const wTitle = FULL && win.querySelector(".wt"), wSw = FULL && win.querySelector(".sw"), wBody = FULL && win.querySelector(".wbody");
   const wCol = FULL && win.querySelector("[data-collapse]");
-  const ficheCache = new Map(); let ficheReq = null, shown = null;
+  let shown = null;
   // Bouton « Isoler » (mobile) : même effet que le double clic sur desktop
   const wIso = FULL && win.querySelector("[data-iso]");
   function isoSync() { if (!wIso) return; const on = !!state.ring;
@@ -539,7 +536,7 @@ function init(G) {
     // Une fiche dépliée ne doit pas dépasser du bas de l'écran
     if (!c && innerWidth > 760) requestAnimationFrame(() => { const r = win.getBoundingClientRect(); if (r.bottom > innerHeight - 8) win.style.top = Math.max(8, innerHeight - 8 - r.height) + "px"; }); }
   function resetFiche() {
-    shown = null; if (ficheReq) ficheReq.abort();
+    shown = null;
     win.classList.add("empty"); document.body.classList.remove("hasfiche"); wTitle.textContent = "Fiche";
     wBody.innerHTML = `<p class="muted">Clique sur un point pour lire sa fiche.</p>`;
     setCollapsed(true);
@@ -547,18 +544,10 @@ function init(G) {
   async function loadFiche(id) {
     const n = byId.get(id); if (!n || shown === id) return; shown = id;
     win.classList.remove("empty"); document.body.classList.add("hasfiche"); wTitle.textContent = n.name; wSw.style.background = color(n); wSw.dataset.s = shapeOf(n.type);
-    if (ficheCache.has(id)) return renderFiche(ficheCache.get(id));
-    wBody.innerHTML = `<div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:70%"></div>`;
-    wBody.setAttribute("aria-busy", "true");
-    if (ficheReq) ficheReq.abort();
-    ficheReq = new AbortController();
-    try {
-      const r = await fetch(API_FICHE(id), { signal: ficheReq.signal });
-      const j = r.ok ? await r.json() : null;
-      if (!r.ok) throw new Error(r.status === 404 ? "Cette fiche sera disponible à la prochaine mise à jour." : "Erreur " + r.status);
-      ficheCache.set(id, j); if (shown === id) renderFiche(j);
-    } catch (e) {
-      if (e.name === "AbortError") return;
+    wBody.innerHTML = U.SKEL; wBody.setAttribute("aria-busy", "true");
+    try { const j = await U.loadFiche(id); if (shown === id) renderFiche(j); }
+    catch (e) {
+      if (e.name === "AbortError" || shown !== id) return;
       wBody.removeAttribute("aria-busy");
       wBody.innerHTML = `<p>Le contenu de cette fiche ne se charge pas.</p><p class="muted">${esc(e.message)}</p><div class="acts"><button class="btn" data-retry>Réessayer</button></div>`;
       wBody.querySelector("[data-retry]").onclick = () => { shown = null; loadFiche(id); };
@@ -578,49 +567,24 @@ function init(G) {
     wBody.querySelectorAll("[data-res]").forEach(b => b.onclick = () => showRes(b.dataset.res));
   }
   // Fiche d'une ressource : même fenêtre qu'une fiche, avec le lien vers le template et les fiches liées
-  // Ressources à plusieurs planches : libellés des boutons et liens supplémentaires
-  const RES_EXTRA = {
-    "Guide d'entretien utilisateur": {
-      open: [["Ouvrir la grille de prise de notes", "ressources/grille-de-prise-de-notes.html"]],
-      papier: [["Version papier de la grille", "ressources/grille-de-prise-de-notes.html?papier"]]
-    }
-  };
-  async function showRes(rid) {
+  // Ressource : même fenêtre qu'une fiche ; boutons et contenu viennent de commun.js (comme la page Ressources)
+  function showRes(rid) {
     const r = resById.get(rid); if (!r || !FULL) return;
-    if (ficheReq) ficheReq.abort();
     shown = "res:" + rid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
     wTitle.textContent = r.name; wSw.style.background = "var(--accent)"; delete wSw.dataset.s;
-    const render = j => {
+    wBody.innerHTML = U.SKEL; wBody.setAttribute("aria-busy", "true");
+    const render = j => { if (shown !== "res:" + rid) return;
       wBody.removeAttribute("aria-busy");
-      const props = j && j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
-      const body = j && j.html.trim() ? j.html : `<p class="muted">Pas encore de mode d'emploi pour cette ressource.</p>`;
-      const ls = r.liees.map(i => byId.get(i)).filter(Boolean);
-      // « Version papier » : la fiche vierge à imprimer (les images de la page Notion sont des exemples remplis)
-      const X = RES_EXTRA[r.name] || {};
-      const own = /\/DataUX\/ressources\/[\w-]+\.html$/.test(r.url);
-      const dl = (own ? [["Version papier vierge", r.url + "?papier"]] : []).concat(X.papier || [])
-        .map(([label, href]) => `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`).join("");
-      const more = (X.open || []).map(([label, href]) => `<a class="btn" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`).join("");
-      const F = G.forms || {};
-      wBody.innerHTML = props + `<div class="acts" style="margin:0 0 12px"><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir le template ↗</a>${more}${dl}</div>` + body
-        + (ls.length ? `<div class="contrib"><h4>Fiches liées</h4><ul class="links">${ls.map(n => item(n)).join("")}</ul></div>` : "")
-        + (F.erreur ? `<div class="acts"><a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: r.name, lien: r.url }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a></div>` : "");
+      wBody.innerHTML = U.resActs(r) + U.resHTML(D, r, j, n => item(n));
       wBody.scrollTop = 0;
       wBody.querySelectorAll("[data-id]").forEach(b => { if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true); else b.replaceWith(...b.childNodes); });
     };
-    if (ficheCache.has(rid)) return render(ficheCache.get(rid));
-    wBody.innerHTML = `<div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel" style="width:85%"></div>`;
-    wBody.setAttribute("aria-busy", "true");
-    ficheReq = new AbortController();
-    try { const res = await fetch(API_FICHE(rid), { signal: ficheReq.signal }); const j = res.ok ? await res.json() : null;
-      if (j) ficheCache.set(rid, j); if (shown === "res:" + rid) render(j); }
-    catch (e) { if (e.name !== "AbortError" && shown === "res:" + rid) render(null); }
+    U.loadFiche(rid).then(render).catch(e => { if (!e || e.name !== "AbortError") render(null); });
   }
   // Fiche d'un contributeur : métier, liens et fiches relues (cliquables)
   const peopleById = D.people;
   function showPerson(pid) {
     const p = peopleById.get(pid); if (!p || !FULL) return;
-    if (ficheReq) ficheReq.abort();
     shown = "person:" + pid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
     wTitle.textContent = p.name; wSw.style.background = "var(--text-muted)"; delete wSw.dataset.s;
     wBody.removeAttribute("aria-busy");

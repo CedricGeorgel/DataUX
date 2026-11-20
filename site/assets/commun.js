@@ -48,7 +48,14 @@ function data(G) {
 
 // ---------- Cartes rangées par groupe, avec filtre texte (et filtre par groupe en option)
 // groups : [{ key, title (html), items: [{ key, anchor, name, meta, search, color }] }]
-function grille(el, groups, noun) {
+// jump (optionnel) : barre de puces qui fait défiler jusqu'au groupe (lien d'ancre, pas un filtre)
+function grille(el, groups, noun, jump) {
+  if (jump) {
+    jump.innerHTML = groups.filter(g => g.items.length).map(g => `<button type="button" class="chip" data-g="${esc(g.key)}">${g.title}</button>`).join("");
+    jump.addEventListener("click", e => { const b = e.target.closest("[data-g]"); if (!b) return;
+      const sec = el.querySelector(`.fam[data-g="${CSS.escape(b.dataset.g)}"]`);
+      if (sec) sec.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); });
+  }
   el.innerHTML = groups.filter(g => g.items.length).map(g => `<section class="fam" data-g="${esc(g.key)}"><h2>${g.title} <span class="fc-n">${g.items.length}</span></h2><div class="cards">${g.items.map(it =>
     `<a class="card" href="#${esc(it.anchor)}" data-key="${esc(it.key)}" data-k="${esc(fold(it.search || it.name))}" style="--c:${it.color}">
       <span class="cn">${esc(it.name)}</span>${it.meta ? `<span class="cm">${esc(it.meta)}</span>` : ""}</a>`).join("")}</div></section>`).join("");
@@ -60,7 +67,8 @@ function grille(el, groups, noun) {
       const v = fold(String(text || "").trim()); let c = 0;
       fams.forEach(f => { let k = 0; const show = !keep || keep.has(f.dataset.g);
         f.querySelectorAll(".card").forEach(a => { const ok = show && (!v || a.dataset.k.includes(v)); a.hidden = !ok; if (ok) k++; });
-        f.hidden = !k; f.querySelector(".fc-n").textContent = k; c += k; });
+        f.hidden = !k; f.querySelector(".fc-n").textContent = k; c += k;
+        const j = jump && jump.querySelector(`[data-g="${CSS.escape(f.dataset.g)}"]`); if (j) j.hidden = !k; });
       return c ? `${c} ${noun}${c > 1 ? "s" : ""}` : `Aucune ${noun} ne correspond.`;
     }
   };
@@ -75,7 +83,9 @@ function vue({ grid, head, split, title, cardFor, route }) {
   function animate(fn, card) {
     if (!canVT()) return fn();
     if (card) card.style.viewTransitionName = "fiche";
-    document.startViewTransition(() => { if (card) card.style.viewTransitionName = ""; fn(); });
+    // Une animation interrompue (fenêtre redimensionnée…) n'est pas une erreur : la page est déjà à jour
+    const t = document.startViewTransition(() => { if (card) card.style.viewTransitionName = ""; fn(); });
+    t.ready.catch(() => {}); t.finished.catch(() => {});
   }
   const api = {
     get current() { return cur; },
@@ -95,7 +105,7 @@ function vue({ grid, head, split, title, cardFor, route }) {
       const c = cur && cardFor(cur);
       if (!canVT() || !c) return api.close();
       const t = document.startViewTransition(() => { api.close(); c.style.viewTransitionName = "fiche"; });
-      t.finished.finally(() => { c.style.viewTransitionName = ""; });
+      t.ready.catch(() => {}); t.finished.catch(() => {}).finally(() => { c.style.viewTransitionName = ""; });
     },
     // Aller à une adresse (#…) ou revenir à la liste (sans argument), en gardant l'historique du navigateur
     go(hash) {
@@ -128,6 +138,20 @@ function ficheHTML(D, n, j, { resItem, here }) {
   return propsHTML(j) + bodyHTML(j, "Pas de texte dans le corps de la fiche.") + resH
     + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p>${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
 }
+// ---------- Ressource : boutons du template et contenu, identiques sur la carte et sur la page Ressources
+// Ressources à plusieurs planches : boutons supplémentaires
+const RES_EXTRA = { "Guide d'entretien utilisateur": [["Grille de prise de notes", "ressources/grille-de-prise-de-notes.html"], ["Version papier de la grille", "ressources/grille-de-prise-de-notes.html?papier"]] };
+function resActs(r) {
+  const links = (r.own ? [["Ouvrir le template", r.local], ["Version papier vierge", r.local + "?papier"]] : [["Ouvrir le template", r.url]]).concat(RES_EXTRA[r.name] || []);
+  return `<div class="acts">${links.map(([l, h], i) => `<a class="btn${i ? "" : " main"}" href="${esc(h)}" target="_blank" rel="noopener">${esc(l)} ↗</a>`).join("")}</div>`;
+}
+// ficheItem(n) : comment afficher une fiche liée (bouton sur la carte, lien sur la page Ressources)
+function resHTML(D, r, j, ficheItem) {
+  const ls = r.liees.map(i => D.byId.get(i)).filter(Boolean), F = D.G.forms || {};
+  return propsHTML(j) + bodyHTML(j, "Pas encore de mode d'emploi pour cette ressource.")
+    + (ls.length ? `<div class="contrib"><h4>Fiches liées</h4><ul class="links">${ls.map(ficheItem).join("")}</ul></div>` : "")
+    + (F.erreur ? `<div class="acts"><a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: r.name, lien: r.url }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a></div>` : "");
+}
 // Présentation d'un contributeur : photo, nom, métier, formation, étiquettes, liens, bio, ancienneté
 function personHTML(p) {
   const ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
@@ -157,7 +181,20 @@ function loadFiche(id) {
   return fetch("data/fiches/" + id + ".json", { signal: req.signal }).then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? "Cette fiche sera disponible à la prochaine mise à jour." : "Erreur " + r.status)))
     .then(j => { cache.set(id, j); return j; });
 }
-const loadGraph = () => fetch("data/graph.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : Promise.reject(r.status));
+// Données de la carte : chargées une seule fois.
+// 1. La carte isolée (dans un cadre) reprend celles de la page qui l'affiche : aucun téléchargement.
+// 2. Sinon, la dernière version gardée dans le navigateur s'affiche tout de suite, et le serveur est
+//    interrogé en arrière-plan : une mise à jour (toutes les heures au plus) sert à la visite suivante.
+const GKEY = "dataux-graph";
+function loadGraph() {
+  const keep = t => { window.DataUX._raw = t; return JSON.parse(t); };
+  try { const t = window.parent !== window && window.parent.DataUX && window.parent.DataUX._raw; if (t) return Promise.resolve(keep(t)); } catch (e) {}
+  const net = fetch("data/graph.json", { cache: "no-cache" }).then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(t => { JSON.parse(t); try { localStorage.setItem(GKEY, t); } catch (e) {} return t; });
+  let cached = null; try { cached = localStorage.getItem(GKEY); } catch (e) {}
+  if (cached) { try { const j = keep(cached); net.catch(() => {}); return Promise.resolve(j); } catch (e) {} }
+  return net.then(keep);
+}
 
-window.DataUX = { esc, fold, slug, byName, formUrl, store, SHAPE, sw, data, grille, vue, SKEL, propsHTML, bodyHTML, ficheHTML, personHTML, relues, loadFiche, loadGraph };
+window.DataUX = { resActs, resHTML, esc, fold, slug, byName, formUrl, store, SHAPE, sw, data, grille, vue, SKEL, propsHTML, bodyHTML, ficheHTML, personHTML, relues, loadFiche, loadGraph };
 })();

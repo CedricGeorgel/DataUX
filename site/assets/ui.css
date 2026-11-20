@@ -1,0 +1,51 @@
+/* Composants communs aux trois pages (carte, liste, ressources) : une seule définition chacun.
+   Les pages n'ajoutent que leur mise en place (taille d'un champ dans une barre, verre sur la carte…). */
+:root{--ctl-h:38px;--ctl-sh:0 1px 4px rgba(0,0,0,.1)}
+.muted{color:var(--text-muted)}
+:where(a,button,input,.node):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Menu des vues : Carte, Liste, Ressources */
+.views{display:inline-flex;gap:2px;padding:3px;background:var(--paper);border-radius:12px;box-shadow:var(--ctl-sh);font:500 13px/1 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.views a{display:inline-flex;align-items:center;height:30px;padding:0 14px;border-radius:9px;text-decoration:none;color:var(--text-muted);transition:background .15s,color .15s}
+.views a:hover{color:var(--ink)}
+.views a[aria-current="page"]{background:var(--ink);color:var(--paper)}
+
+/* Champ de recherche */
+.search{font:inherit;font-size:14px;width:240px;height:var(--ctl-h);padding:0 12px;border:0;border-radius:12px;background:var(--paper);color:var(--ink);box-shadow:var(--ctl-sh)}
+
+/* Puces (filtres, familles) et boutons */
+.chip,.btn{font:inherit;font-size:12px;display:inline-flex;align-items:center;gap:6px;border:0;background:var(--paper);color:var(--ink);cursor:pointer;user-select:none;text-decoration:none;box-shadow:var(--ctl-sh)}
+.chip{padding:5px 10px;border-radius:999px}
+.btn{height:32px;padding:0 12px;border-radius:8px;font-size:12.5px}
+.chip:hover,.btn:hover{background:color-mix(in srgb,var(--ink) 9%,var(--paper))}
+.btn.main,.btn.on{background:var(--ink);color:var(--paper)}
+.btn.main:hover,.btn.on:hover{background:color-mix(in srgb,var(--ink) 85%,var(--paper))}
+.chip[aria-pressed="false"]>*{opacity:.4}
+/* Dans un panneau (fiche, panneau de la carte), boutons sur fond beige, sans ombre */
+:where(aside,.win,.fiche) :is(.btn,.chip):not(.main):not(.on){background:var(--surface);box-shadow:none}
+:where(aside,.win,.fiche) :is(.btn,.chip):not(.main):not(.on):hover{background:color-mix(in srgb,var(--ink) 9%,var(--surface))}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+
+/* Liens */
+.lnk{color:var(--ink);text-decoration:none;border:0;border-bottom:1px solid var(--line);cursor:pointer;background:none;font:inherit;padding:0;text-align:left}
+.lnk:hover{border-bottom-color:var(--ink)}
+.back{font-size:12px;color:var(--text-muted);text-decoration:none}
+.back:hover{color:var(--ink)}
+ul.links{list-style:none;padding:0;margin:0}
+ul.links li{padding:3px 0;display:flex;gap:8px;align-items:baseline}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--surface);color:var(--text-muted);margin:0 4px 4px 0}
+
+/* Pastilles : même forme et même couleur que les points de la carte */
+.sw,.dot{flex:none;display:inline-block;width:9px;height:9px;border-radius:50%}
+ul.links li .sw{width:8px;height:8px;transform:translateY(-1px)}
+.sw.res{background:var(--accent);border-radius:2px}
+.sw.conf{background:var(--conf,#d44c47);width:12px;height:2px;border-radius:1px}
+.sw[data-s],.dot[data-s]{border-radius:0}
+.sw[data-s="circle"],.dot[data-s="circle"]{border-radius:50%}
+.sw[data-s="square"],.dot[data-s="square"]{border-radius:2.5px;transform:scale(.9)}
+.sw[data-s="diamond"],.dot[data-s="diamond"]{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transform:scale(1.1)}
+.sw[data-s="triangle"],.dot[data-s="triangle"]{clip-path:polygon(50% 4%,100% 92%,0 92%);transform:scale(1.1)}
+.sw[data-s="tridown"],.dot[data-s="tridown"]{clip-path:polygon(0 8%,100% 8%,50% 96%);transform:scale(1.1)}
+.sw[data-s="hexagon"],.dot[data-s="hexagon"]{clip-path:polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%);transform:scale(1.08)}
+.sw[data-s="pentagon"],.dot[data-s="pentagon"]{clip-path:polygon(50% 0,100% 38%,81% 98%,19% 98%,0 38%);transform:scale(1.08)}
+.sw[data-s="book"],.dot[data-s="book"]{clip-path:inset(0 17% round 1.5px)}

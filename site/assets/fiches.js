@@ -11,18 +11,14 @@ U.loadGraph().then(init).catch(() => { $("grid").innerHTML = `<p class="empty">L
 function init(G) {
   const D = U.data(G), { byId, people } = D;
 
-  // ---------- Cartes par famille, filtre texte et filtre par famille
-  const on = new Set(G.bases.map(b => b.key));
+  // ---------- Cartes par famille ; les puces des familles font défiler jusqu'à la famille
   const grid = U.grille($("grid"), G.bases.map(b => ({ key: b.key, title: D.swOf(b.key) + esc(b.label),
-    items: G.nodes.filter(n => n.type === b.key).sort(U.byName).map(n => ({ key: n.id, anchor: n.anchor, name: n.name, meta: n.cat, search: n.name + " " + (n.cat || ""), color: b.color })) })), "fiche");
-  const filter = () => { $("n").textContent = grid.filter($("q").value, on); };
-  $("chips").innerHTML = G.bases.map(b => `<button class="chip" data-t="${b.key}" aria-pressed="true">${D.swOf(b.key)}${esc(b.label.replace(/^Fiches\s+/, ""))}</button>`).join("");
-  $("chips").querySelectorAll("[data-t]").forEach(b => b.onclick = () => {
-    const t = b.dataset.t; on.has(t) ? on.delete(t) : on.add(t); b.setAttribute("aria-pressed", on.has(t)); filter(); });
+    items: G.nodes.filter(n => n.type === b.key).sort(U.byName).map(n => ({ key: n.id, anchor: n.anchor, name: n.name, meta: n.cat, search: n.name + " " + (n.cat || ""), color: b.color })) })), "fiche", $("jump"));
+  const filter = () => { $("n").textContent = grid.filter($("q").value); };
   $("q").addEventListener("input", filter); filter();
 
   // ---------- Vue scindée
-  const v = U.vue({ grid: $("grid"), head: document.querySelector(".fh"), split: $("split"), title: "Toutes les fiches · DataUX", cardFor: grid.cardFor, route });
+  const v = U.vue({ grid: $("list"), head: document.querySelector(".fh"), split: $("split"), title: "Toutes les fiches · DataUX", cardFor: grid.cardFor, route });
   const map = $("map"), f = $("fiche"); let lastFiche = null;
   map.addEventListener("load", () => map.classList.add("ready"));
   // La carte n'est chargée qu'une fois : ensuite on change seulement son # (pas de rechargement, pas d'événement load)

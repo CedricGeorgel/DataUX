@@ -3,20 +3,17 @@
 html,body{margin:0;background:var(--surface);color:var(--ink);font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
 a{color:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.muted{color:var(--text-muted)}
-.back{font-size:12px;color:var(--text-muted);text-decoration:none}
-.back:hover{color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* En-tête et filtres */
 .fh{max-width:1280px;margin:0 auto;padding:20px 24px 8px;display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
 .fh .views{grid-column:1/-1;justify-self:start;margin-bottom:6px}
+.fh .acts{margin:0}
 .fh h1{margin:0;font-size:22px;font-weight:600}
-.fh .q input{font:inherit;font-size:14px;width:280px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
-.chips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);cursor:pointer}
-.chip[aria-pressed="false"]{background:transparent;color:var(--text-muted);border-style:dashed}
-.chip[aria-pressed="false"] .sw{opacity:.35}
+/* Puces des familles : restent en haut au défilement, mènent à la famille */
+.jump{position:sticky;top:0;z-index:4;display:flex;flex-wrap:wrap;gap:6px;padding:10px 0;background:var(--surface)}
+.jump .chip[hidden]{display:none}
+.fam{scroll-margin-top:64px}
 .n{grid-column:1/-1;margin:4px 0 0;color:var(--text-muted);font-size:12px}
 
 /* Cartes */
@@ -37,16 +34,6 @@ a{color:inherit}
 .card:hover{background:color-mix(in srgb,var(--c) 9%,var(--paper))}
 .empty{grid-column:1/-1;color:var(--text-muted)}
 
-/* Pastilles : même forme que sur la carte */
-.sw{flex:none;display:inline-block;width:9px;height:9px}
-.sw[data-s="circle"]{border-radius:50%}
-.sw[data-s="square"]{border-radius:2px;transform:scale(.9)}
-.sw[data-s="diamond"]{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);transform:scale(1.1)}
-.sw[data-s="triangle"]{clip-path:polygon(50% 4%,100% 92%,0 92%);transform:scale(1.1)}
-.sw[data-s="tridown"]{clip-path:polygon(0 8%,100% 8%,50% 96%);transform:scale(1.1)}
-.sw[data-s="hexagon"]{clip-path:polygon(25% 7%,75% 7%,100% 50%,75% 93%,25% 93%,0 50%);transform:scale(1.08)}
-.sw[data-s="pentagon"]{clip-path:polygon(50% 0,100% 38%,81% 98%,19% 98%,0 38%);transform:scale(1.08)}
-.sw[data-s="book"]{clip-path:inset(0 17% round 1.5px)}
 
 /* Vue scindée : fiche à gauche, carte isolée à droite */
 .split{position:fixed;inset:0;display:grid;grid-template-columns:minmax(360px,42%) 1fr}
@@ -61,8 +48,6 @@ body.split-on{overflow:hidden}
 .fiche .body{font-size:14px;line-height:1.6;max-width:68ch}
 .fiche h5{font-size:14px;margin:18px 0 4px}
 .fiche h4{font-size:13px;margin:22px 0 6px}
-.fiche .lnk{color:var(--ink);text-decoration:none;border:0;border-bottom:1px solid var(--line-strong);background:none;font:inherit;padding:0;cursor:pointer}
-.fiche .lnk:hover{border-bottom-color:var(--ink)}
 .fiche .res{margin:0;padding-left:18px}
 .skel{height:12px;margin:10px 0;border-radius:4px;background:var(--surface)}
 .skel.short{width:60%}
@@ -71,7 +56,7 @@ body.split-on{overflow:hidden}
 
 @media (max-width:760px){
   .fh{grid-template-columns:1fr;padding:16px}
-  .fh .q input{width:100%}
+  .fh .search{width:100%}
   .grid{padding:8px 16px 32px}
   .cards{grid-template-columns:1fr 1fr}
   .split{grid-template-columns:1fr;grid-template-rows:55% 45%}
@@ -114,11 +99,6 @@ body.split-on{overflow:hidden}
 }
 
 /* Page Ressources : boutons d'action */
-.sw.res{width:9px;height:9px;border-radius:2px;background:var(--accent)}
-.acts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
-.btn{display:inline-flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);text-decoration:none;font-size:12.5px}
-.btn:hover{border-color:var(--line-strong)}
-.btn.main{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .res-page .card{min-height:72px}
 
 /* Images du mode d'emploi : elles suivent la largeur du panneau, jamais l'inverse */
@@ -143,14 +123,10 @@ body.split-on{overflow:hidden}
 .phead.big .pphoto{width:64px;height:64px;font-size:20px}
 .phead.big h1{margin:0 0 2px}
 .ptags{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 12px}
-.tag{font-size:11.5px;padding:2px 8px;border:1px solid var(--line);border-radius:999px;color:var(--text-muted)}
 .pgrp{display:flex;align-items:center;gap:6px;margin:14px 0 4px;font-size:13px}
 .plist{margin:0;padding:0;list-style:none;columns:2;column-gap:20px}
 .plist li{break-inside:avoid;padding:2px 0}
-.plist .lnk{text-align:left}
 /* Listes de liens dans la fiche (ressources, fiches liées) */
-.fiche ul.links{list-style:none;margin:0;padding:0}
-.fiche ul.links li{display:flex;gap:8px;align-items:baseline;padding:2px 0}
 .fiche .phead{margin:4px 0 12px}
 .fiche .phead .pphoto{width:64px;height:64px;font-size:20px}
 .fiche .pname{font-size:22px;font-weight:600}

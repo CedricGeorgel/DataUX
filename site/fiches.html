@@ -7,18 +7,17 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <link rel="stylesheet" href="assets/tokens.css">
-<link rel="stylesheet" href="assets/nav.css">
+<link rel="stylesheet" href="assets/ui.css">
 <link rel="stylesheet" href="assets/fiches.css">
 </head>
 <body>
 <header class="fh">
   <nav class="views" aria-label="Vues"><a href="./">Carte</a><a href="fiches.html" aria-current="page">Liste</a><a href="ressources.html">Ressources</a></nav>
   <h1>Toutes les fiches</h1>
-  <label class="q"><span class="sr">Filtrer les fiches</span><input id="q" type="search" placeholder="Filtrer les fiches…" autocomplete="off"></label>
-  <div class="chips" id="chips" role="group" aria-label="Bases"></div>
+  <label class="q"><span class="sr">Filtrer les fiches</span><input id="q" class="search" type="search" placeholder="Filtrer les fiches…" autocomplete="off"></label>
   <p class="n" id="n" role="status"></p>
 </header>
-<main id="grid" class="grid" aria-label="Fiches"></main>
+<main id="list" class="grid"><nav class="chips jump" id="jump" aria-label="Aller à une famille"></nav><div id="grid" aria-label="Fiches"></div></main>
 <section id="split" class="split" hidden>
   <article class="fiche" id="fiche" aria-live="polite"></article>
   <div class="map"><iframe id="map" title="Carte de la fiche et de ses liens"></iframe></div>
