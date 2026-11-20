@@ -47,6 +47,16 @@ function init(G) {
   G.edges.forEach(([a, b]) => { byId.get(a).nb.add(b); byId.get(b).nb.add(a); });
   G.conf.forEach(([a, b]) => { byId.get(a).sug.add(b); byId.get(b).sug.add(a); });
   G.nodes.forEach(n => n.deg = n.nb.size);
+  // Adresse lisible de chaque fiche (#persona). Deux fiches au même nom : la base est ajoutée à la seconde.
+  const fold = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const bySlug = new Map();
+  G.nodes.slice().sort((a, b) => b.deg - a.deg || (a.id < b.id ? -1 : 1)).forEach(n => {
+    let s = fold(n.name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || n.id;
+    if (bySlug.has(s)) s += "-" + n.type; if (bySlug.has(s)) s += "-" + n.id.slice(0, 4);
+    n.anchor = s; bySlug.set(s, n.id); });
+  // Accepte aussi les anciens liens (#identifiant Notion)
+  const fromHash = h => { try { h = decodeURIComponent(h || "").toLowerCase(); } catch (e) { return null; }
+    if (bySlug.has(h)) return bySlug.get(h); h = h.replace(/-/g, ""); return byId.has(h) ? h : null; };
 
   // ---------- Densité des liens selon le zoom
   // Chaque fiche classe ses liens du plus fort au plus faible : voisins communs, même groupe,
@@ -154,6 +164,12 @@ function init(G) {
     sugBtn.onclick = () => { state.showSug = !state.showSug; sugLabel(); state.focus ? select(state.focus, false, state.ring) : update(); };
     const dl = $("names");
     G.nodes.slice().sort((a, b) => a.name.localeCompare(b.name, "fr")).forEach(n => { const o = document.createElement("option"); o.value = n.name; dl.appendChild(o); });
+    $("listBtn").onclick = () => {
+      if (state.focus) select(null);
+      state.panel = "list";
+      if (document.body.classList.contains("nopanel")) $("panelBtn").click(); else renderPanel();
+      const q = $("listQ"); if (q && !MOB()) q.focus({ preventScroll: true });
+    };
     $("q").addEventListener("change", e => {
       const v = e.target.value.trim().toLowerCase(); if (!v) return;
       const n = G.nodes.find(x => x.name.toLowerCase() === v) || G.nodes.find(x => x.name.toLowerCase().includes(v));
@@ -234,7 +250,7 @@ function init(G) {
     edgeSel = gEdges.selectAll("line").data(visEdges, d => (d.source.id || d.source) + (d.target.id || d.target) + d.sug)
       .join("line").attr("class", d => "edge" + (d.sug ? " sug" : "") + (!d.sug && !sameComm(d.source, d.target) ? " cross" : ""));
     nodeSel = gNodes.selectAll("g.node").data(visNodes, d => d.id).join(enter => {
-      const g = enter.append("g").attr("class", "node").attr("tabindex", 0).attr("role", "button")
+      const g = enter.append("g").attr("class", "node").attr("tabindex", -1).attr("role", "button")
         .attr("aria-label", d => `${d.name}, ${TYPES[d.type].label}, ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
       g.append("path").attr("class", "mk-o").attr("d", markD);
       g.append("path").attr("class", "mk").attr("d", markD);
@@ -242,14 +258,41 @@ function init(G) {
       g.append("title").text(d => `${d.name} · ${d.deg} lien${d.deg > 1 ? "s" : ""}`);
       g.on("click", (e, d) => { e.stopPropagation(); if (state.focus !== d.id || state.ring) select(d.id); })
        .on("dblclick", (e, d) => { e.stopPropagation(); e.preventDefault(); select(d.id, false, true); })
-       .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.id, false, e.shiftKey); } })
+       .on("focus", (e, d) => setRov(d.id))
+       .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.id, false, e.shiftKey); }
+         else if (DIRS[e.key]) { e.preventDefault(); moveFocus(d, DIRS[e.key]); }
+         else if (e.key === "Escape" && state.focus) { e.preventDefault(); select(null); } })
        .call(d3.drag().on("start", (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
          .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; }).on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); if (!d.ring) { d.fx = null; d.fy = null; } }));
       return g;
     });
     nodeSel.sort((a, b) => a.deg - b.deg);
+    syncRov();
     sim.nodes(visNodes); sim.force("link").links(visEdges); sim.alpha(.8).restart();
     paint(); placeLabels(); labelVis(d3.zoomTransform(svg.node()).k); edgeVis(d3.zoomTransform(svg.node()).k); highlight();
+  }
+  // ---------- Clavier : un seul point dans l'ordre de tabulation (Tab entre puis sort de la carte),
+  // les flèches passent au point le plus proche dans la direction. Fiche ouverte : seulement parmi ses liens.
+  let rov = null;
+  const DIRS = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+  function setRov(id) { rov = id; if (nodeSel) nodeSel.attr("tabindex", d => d.id === rov ? 0 : -1); }
+  function syncRov() {
+    if (!visNodes.length) return;
+    const has = id => id && visNodes.some(n => n.id === id);
+    setRov(has(state.focus) ? state.focus : has(rov) ? rov : visNodes.reduce((a, b) => b.deg > a.deg ? b : a).id);
+  }
+  function moveFocus(d, [ux, uy]) {
+    const f = state.focus && byId.get(state.focus), keep = f ? new Set([f.id, ...f.nb, ...(state.showSug ? f.sug : [])]) : null;
+    let best = null, bs = Infinity;
+    visNodes.forEach(n => { if (n === d || (keep && !keep.has(n.id))) return;
+      const dx = n.x - d.x, dy = n.y - d.y, along = dx * ux + dy * uy; if (along <= 0) return;
+      const s = along + 2.5 * Math.abs(dx * uy - dy * ux); if (s < bs) { bs = s; best = n; } });
+    if (!best) return;
+    setRov(best.id);
+    const el = nodeSel.filter(n => n.id === best.id).node(); if (el) el.focus({ preventScroll: true });
+    const v = viewArea();
+    if (offscreen(best, v)) { const k = d3.zoomTransform(svg.node()).k;
+      svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity.translate(v.cx - best.x * k, v.cy - best.y * k).scale(k)); }
   }
   function placeLabels() { if (!nodeSel) return;
     nodeSel.select("text")
@@ -339,7 +382,7 @@ function init(G) {
   // 1 clic : on montre les liens sans toucher à la disposition. Double clic : la fiche est isolée en couronne.
   function select(id, center, ring = false) {
     const wasRing = state.ring;
-    state.focus = id; state.ring = !!(id && ring); if (id) state.panel = null;
+    state.focus = id; state.ring = !!(id && ring); if (id) setRov(id);
     releaseRing();
     if (id) { const n = byId.get(id);
       if (!state.types.has(n.type)) { state.types.add(n.type); if (chips) [...chips.children][typeKeys.indexOf(n.type)].classList.remove("off"); }
@@ -357,10 +400,11 @@ function init(G) {
       }
     } else { highlight(); placeLabels(); sim.alpha(.4).restart(); if (FULL) resetFiche(); }
     labelVis(d3.zoomTransform(svg.node()).k);
-    if (bigLink) bigLink.href = BIG + (id ? "#" + id : "");
+    const anc = id ? "#" + byId.get(id).anchor : "";
+    if (bigLink) bigLink.href = BIG + anc;
     if (FULL) {
       isoSync(); renderPanel();
-      if (history.replaceState) history.replaceState(null, "", id ? "#" + id : location.pathname + location.search);
+      if (history.replaceState) history.replaceState(null, "", anc || location.pathname + location.search);
     }
   }
   // La fiche choisie est-elle cachée (hors écran ou sous la fenêtre) ?
@@ -385,7 +429,26 @@ function init(G) {
     return `<button class="theme" role="switch" aria-checked="${d}" data-theme-switch><span class="trk" aria-hidden="true"></span>Mode sombre</button>`; };
   function renderPanel() {
     if (!panel) return;
-    if (!state.focus && state.panel === "res") {
+    if (panel.dataset.view === "list") state.listScroll = panel.scrollTop;
+    panel.dataset.view = !state.focus && state.panel === "list" ? "list" : "";
+    if (!state.focus && state.panel === "list") {
+      // Toutes les fiches, par base et par ordre alphabétique, avec un filtre (alternative à la carte)
+      const groups = typeKeys.map(t => [t, G.nodes.filter(n => n.type === t).sort((a, b) => a.name.localeCompare(b.name, "fr"))]).filter(([, a]) => a.length);
+      panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
+        <h1 style="margin-top:12px">Toutes les fiches</h1>
+        <label class="lfilt">Filtrer la liste<input type="search" id="listQ" autocomplete="off" value="${esc(state.listQ || "")}"></label>
+        <p class="muted" id="listN" role="status"></p>
+        ${groups.map(([t, a]) => `<section class="lgrp"><h3>${esc(TYPES[t].label)} · <span>${a.length}</span></h3><ul class="links">${a.map(n => item(n)).join("")}</ul></section>`).join("")}
+        <div class="pfoot">${themeSwitch()}</div>`;
+      const q = $("listQ");
+      const run = () => { state.listQ = q.value; const v = fold(q.value.trim()); let tot = 0;
+        panel.querySelectorAll(".lgrp").forEach(g => { let c = 0;
+          g.querySelectorAll("li").forEach(li => { const ok = !v || fold(li.textContent).includes(v); li.hidden = !ok; if (ok) c++; });
+          g.hidden = !c; g.querySelector("h3 span").textContent = c; tot += c; });
+        $("listN").textContent = tot ? tot + " fiche" + (tot > 1 ? "s" : "") : "Aucune fiche ne correspond."; };
+      q.oninput = run; run();
+      panel.scrollTop = state.listScroll || 0;
+    } else if (!state.focus && state.panel === "res") {
       const ord = G.resThemes || [], rank = k => { const i = ord.indexOf(k); return i < 0 ? ord.length : i; };
       const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || rank(a) - rank(b) || a.localeCompare(b, "fr"));
       panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
@@ -395,7 +458,7 @@ function init(G) {
         <div class="pfoot">${themeSwitch()}</div>`;
     } else if (state.focus) { const n = byId.get(state.focus);
       const groups = {}; [...n.nb].map(i => byId.get(i)).forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
-      let h = `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
+      let h = `<button class="lnk back" data-back="1">← ${state.panel === "list" ? "Toutes les fiches" : state.panel === "res" ? "Ressources" : "Vue d'ensemble"}</button>
         <h1 style="margin-top:12px">${esc(n.name)}</h1>
         <p><span class="tag" style="border-color:${color(n)}">${esc(TYPES[n.type].label)}</span>${n.cat ? `<span class="tag">${esc(n.cat)}</span>` : ""}</p>
         <h2>${n.deg} lien${n.deg > 1 ? "s" : ""}</h2>`;
@@ -409,6 +472,7 @@ function init(G) {
       const when = new Date(G.generated).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
       panel.innerHTML = grab() + `<h1>Réseau des fiches</h1>
         <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
+        <p><button class="lnk" data-list="1">Voir les ${G.nodes.length} fiches en liste →</button></p>
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>
@@ -419,6 +483,7 @@ function init(G) {
         </div>`;
     }
     panel.querySelectorAll("[data-id]").forEach(b => b.onclick = () => select(b.dataset.id, true));
+    panel.querySelectorAll("[data-list]").forEach(b => b.onclick = () => $("listBtn").click());
     panel.querySelectorAll("[data-comm]").forEach(b => b.onclick = () => zoomComm(+b.dataset.comm));
     panel.querySelectorAll("[data-res]").forEach(b => b.onclick = () => showRes(b.dataset.res));
     const bk = panel.querySelector("[data-back]"); if (bk) bk.onclick = () => { if (state.panel && !state.focus) { state.panel = null; renderPanel(); } else select(null); };
@@ -477,7 +542,7 @@ function init(G) {
     const who = j.contributors && j.contributors.length ? j.contributors.map(c => typeof c === "string" ? esc(c)
       : peopleById.has(c.id) ? `<button class="lnk" data-person="${esc(c.id)}">${esc(c.name)}</button>` : esc(c.name)).join(", ")
       : `<span class="muted">Personne pour l'instant</span>`;
-    const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.id;
+    const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.anchor;
     const acts = [
       F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
       F.proposition ? `<a class="btn" href="${esc(formUrl(F.proposition, { liee: n.name }))}" target="_blank" rel="noopener noreferrer">Proposer une fiche liée</a>` : "",
@@ -614,7 +679,7 @@ function init(G) {
         ${G.bases.map(b => `<li><span class="dot" data-s="${shapeOf(b.key)}" style="background:${b.color}"></span>${esc(b.one || b.label)}</li>`).join("")}
       </ul>
       ${MOB() ? `<ul class="leg help"><li>Toucher : ouvrir la fiche.</li><li>Pincer pour voir plus de liens.</li></ul>`
-        : `<ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Zoomer pour voir plus de liens, glisser pour déplacer.</li></ul>`}`;
+        : `<ul class="leg help"><li>Clic : voir les liens.</li><li>Double clic : isoler la fiche.</li><li>Zoomer pour voir plus de liens, glisser pour déplacer.</li><li>Clavier : Tab, puis flèches ; Entrée ouvre la fiche.</li></ul>`}`;
     const setL = c => { lw.classList.toggle("collapsed", c); lc.setAttribute("aria-expanded", !c); lc.setAttribute("aria-label", c ? "Déplier la légende" : "Replier la légende"); lc.textContent = c ? "▸" : "▾"; store.set("reseau-legend-collapsed", c); };
     lc.onclick = () => setL(!lw.classList.contains("collapsed"));
     lw.querySelector(".whead").addEventListener("dblclick", e => { if (!e.target.closest("button")) setL(!lw.classList.contains("collapsed")); });
@@ -650,7 +715,8 @@ function init(G) {
   sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
   addEventListener("resize", () => { fitBar(); if (!state.focus) fitNodes(visNodes, 1.2, 0); });
-  const deep = location.hash.slice(1).replace(/-/g, "").toLowerCase();
-  if (deep && byId.has(deep)) select(deep, true);
+  const deep = fromHash(location.hash.slice(1));
+  if (deep) select(deep, true);
+  addEventListener("hashchange", () => { const d = fromHash(location.hash.slice(1)); if (d && d !== state.focus) select(d, true); });
 }
 })();
