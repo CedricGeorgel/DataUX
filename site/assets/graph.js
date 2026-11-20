@@ -191,6 +191,19 @@ function init(G) {
   const svg = d3.select("#svg"); svg.selectAll("*").remove();
   const root = svg.append("g");
   const gEdges = root.append("g"), gNodes = root.append("g");
+  // Mode verrouillé : seules la fiche et ses voisines sont tracées. Le reste de la carte est un décor
+  // de points et de traits inventés (fixe, non cliquable), pour garder l'idée d'un réseau sans calculer les 406 fiches.
+  if (LOCK) {
+    const gDeco = root.insert("g", ":first-child").attr("class", "deco").attr("aria-hidden", "true");
+    const rnd = d3.randomLcg(11), cols = G.bases.map(b => b.color), pts = [];
+    while (pts.length < 240) { const a = rnd() * 2 * Math.PI, r = 340 + Math.sqrt(rnd()) * 1300;
+      pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, c: cols[Math.floor(rnd() * cols.length)], s: 2 + rnd() * 3.5 }); }
+    const lines = [];
+    pts.forEach((p, i) => { const near = pts.map((q, j) => [j, (q.x - p.x) ** 2 + (q.y - p.y) ** 2]).filter(([j]) => j > i).sort((a, b) => a[1] - b[1]);
+      near.slice(0, rnd() < .5 ? 1 : 2).forEach(([j]) => lines.push([p, pts[j]])); });
+    gDeco.selectAll("line").data(lines).join("line").attr("x1", d => d[0].x).attr("y1", d => d[0].y).attr("x2", d => d[1].x).attr("y2", d => d[1].y);
+    gDeco.selectAll("circle").data(pts).join("circle").attr("cx", d => d.x).attr("cy", d => d.y).attr("r", d => d.s).attr("fill", d => d.c);
+  }
   const zoom = d3.zoom().scaleExtent([.15, 5]).on("zoom", e => { root.attr("transform", e.transform); labelVis(e.transform.k); edgeVis(e.transform.k); });
   svg.call(zoom).on("dblclick.zoom", null);
   svg.on("click", e => { if (e.target === svg.node() && !LOCK) select(null); });
@@ -242,7 +255,12 @@ function init(G) {
   let nodeSel, edgeSel, visNodes = [], visEdges = [];
   function update() {
     filterCount();
+    const before = new Set(visNodes.map(n => n.id));
     visNodes = G.nodes.filter(n => state.types.has(n.type) && (state.showIso || n.deg > 0 || (state.showSug && n.sug.size)));
+    if (LOCK && state.focus) { const f = byId.get(state.focus), keep = new Set([f.id, ...f.nb, ...(state.showSug ? f.sug : [])]);
+      visNodes = visNodes.filter(n => keep.has(n.id));
+      // Les nouvelles voisines partent du centre de la fiche : la couronne s'ouvre au lieu d'apparaître d'un coup
+      visNodes.forEach(n => { if (!before.has(n.id) && n !== f) { n.x = f.x + (Math.random() - .5) * 4; n.y = f.y + (Math.random() - .5) * 4; } }); }
     const vis = new Set(visNodes.map(n => n.id));
     visEdges = G.edges.filter(([a, b]) => vis.has(a) && vis.has(b)).map(([a, b]) => ({ source: a, target: b, sug: false }));
     if (state.showSug) G.conf.forEach(([a, b]) => { if (vis.has(a) && vis.has(b)) visEdges.push({ source: a, target: b, sug: true }); });
@@ -685,10 +703,11 @@ function init(G) {
 
   // ---------- Lancement
   if (MOB()) { document.body.classList.add("nopanel"); $("panelBtn").setAttribute("aria-expanded", false); }
+  if (LOCK) { const d0 = fromHash(location.hash.slice(1)); if (d0) { state.focus = d0; G.nodes.forEach(n => { n.x = 0; n.y = 0; }); } }
   update(); renderPanel(); fitBar();
   if (document.fonts) document.fonts.ready.then(() => fitBar());
   sim.stop();
-  if (!cached) { for (let i = 0; i < 450; i++) sim.tick();
+  if (!cached && !LOCK) { for (let i = 0; i < 450; i++) sim.tick();
     const p = {}; G.nodes.forEach(n => { p[n.id] = [Math.round(n.x * 10) / 10, Math.round(n.y * 10) / 10]; });
     store.set(LKEY, { sig: lsig, p }); }
   else G.nodes.forEach(n => { n.vx = 0; n.vy = 0; });

@@ -323,3 +323,7 @@ aside .btn:hover,.win .btn:hover,.bar:not(.inline) .pop .chip:hover{background:c
 /* Clavier (20/11/2026) */
 .node:focus-visible text{display:inline!important}
 a.btn#listBtn{text-decoration:none;color:var(--ink)}
+/* Carte isolée de la page des fiches : décor inventé, très discret */
+.deco{pointer-events:none}
+.deco line{stroke:var(--line-strong);stroke-width:1;opacity:.16}
+.deco circle{opacity:.26}

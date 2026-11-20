@@ -32,52 +32,76 @@ function init(G) {
   $("chips").innerHTML = G.bases.map(b => `<button class="chip" data-t="${b.key}" aria-pressed="true">${sw(b.key)}${esc(b.label.replace(/^Fiches\s+/, ""))}</button>`).join("");
   $("chips").querySelectorAll("[data-t]").forEach(b => b.onclick = () => {
     const t = b.dataset.t; on.has(t) ? on.delete(t) : on.add(t); b.setAttribute("aria-pressed", on.has(t)); filter(); });
-  const sorted = G.nodes.slice().sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  $("grid").innerHTML = sorted.map(n => `<a class="card" href="#${n.anchor}" data-id="${n.id}" data-t="${n.type}" data-k="${esc(fold(n.name + " " + (n.cat || "")))}">
-      <span class="ct">${sw(n.type)}${esc(TYPES[n.type].one || TYPES[n.type].label)}</span>
-      <span class="cn">${esc(n.name)}</span>
-      <span class="cm">${n.cat ? esc(n.cat) + " · " : ""}${n.deg} lien${n.deg > 1 ? "s" : ""}</span></a>`).join("");
-  const cards = [...$("grid").children];
+  // Classées par famille (ordre des bases), puis par ordre alphabétique. Fond teinté à 5 % de la couleur de la famille.
+  $("grid").innerHTML = G.bases.map(b => { const ns = G.nodes.filter(n => n.type === b.key).sort((x, y) => x.name.localeCompare(y.name, "fr"));
+    return ns.length ? `<section class="fam" data-t="${b.key}"><h2>${sw(b.key)}${esc(b.label)} <span class="fc-n">${ns.length}</span></h2><div class="cards">${ns.map(n =>
+      `<a class="card" href="#${n.anchor}" data-id="${n.id}" data-k="${esc(fold(n.name + " " + (n.cat || "")))}" style="--c:${b.color}">
+        <span class="cn">${esc(n.name)}</span>${n.cat ? `<span class="cm">${esc(n.cat)}</span>` : ""}</a>`).join("")}</div></section>` : ""; }).join("");
+  const cards = [...$("grid").querySelectorAll(".card")], fams = [...$("grid").querySelectorAll(".fam")];
   function filter() {
     const v = fold($("q").value.trim()); let c = 0;
-    cards.forEach(a => { const ok = on.has(a.dataset.t) && (!v || a.dataset.k.includes(v)); a.hidden = !ok; if (ok) c++; });
+    fams.forEach(f => { let k = 0; const show = on.has(f.dataset.t);
+      f.querySelectorAll(".card").forEach(a => { const ok = show && (!v || a.dataset.k.includes(v)); a.hidden = !ok; if (ok) k++; });
+      f.hidden = !k; f.querySelector(".fc-n").textContent = k; c += k; });
     $("n").textContent = c ? `${c} fiche${c > 1 ? "s" : ""}` : "Aucune fiche ne correspond.";
   }
   $("q").addEventListener("input", filter); filter();
 
   // ---------- Vue scindée
-  const map = $("map"), cache = new Map(); let shown = null, req = null;
+  const map = $("map"), cache = new Map(); let shown = null, req = null, gridY = 0;
+  const RM = matchMedia("(prefers-reduced-motion: reduce)");
+  const canVT = () => !RM.matches && !!document.startViewTransition;
+  map.addEventListener("load", () => map.classList.add("ready"));
   // La carte prévient quand on y ouvre un autre point : on suit sans recharger la carte
   addEventListener("message", e => {
     if (e.origin !== location.origin || e.source !== map.contentWindow || !e.data || e.data.dataux !== "fiche") return;
     const n = byId.get(e.data.id); if (n && n.id !== shown) { history.pushState(null, "", "#" + n.anchor); open(n.id, true); }
   });
-  function route() { const id = fromHash(); if (id) open(id); else close(); }
-  addEventListener("hashchange", route);
-  addEventListener("popstate", route);
+  // Ouverture : la carte cliquée s'agrandit jusqu'à devenir le panneau de la fiche (View Transitions),
+  // la carte du réseau glisse depuis la droite. Fermeture : le chemin inverse, vers la carte d'origine.
+  function openAnim(id, card) {
+    if (!canVT()) return open(id);
+    if (card) card.style.viewTransitionName = "fiche";
+    document.startViewTransition(() => { if (card) card.style.viewTransitionName = ""; open(id); });
+  }
+  function closeAnim() {
+    const c = cards.find(a => a.dataset.id === shown);
+    if (!canVT() || !c) return close();
+    const t = document.startViewTransition(() => { close(); c.style.viewTransitionName = "fiche"; });
+    t.finished.finally(() => { c.style.viewTransitionName = ""; });
+  }
+  $("grid").addEventListener("click", e => {
+    const a = e.target.closest(".card"); if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault(); history.pushState(null, "", a.getAttribute("href")); openAnim(a.dataset.id, a);
+  });
+  function route(anim) { const id = fromHash();
+    if (id) { if (anim && !shown) openAnim(id); else open(id); } else if (anim) closeAnim(); else close(); }
+  addEventListener("popstate", () => route(true));
   function close() {
     if (!shown) return; const last = shown; shown = null;
     document.body.classList.remove("split-on"); $("split").hidden = true; $("grid").hidden = false; document.querySelector(".fh").hidden = false;
     document.title = "Toutes les fiches · DataUX";
-    const c = cards.find(a => a.dataset.id === last); if (c) c.focus({ preventScroll: false });
+    scrollTo(0, gridY);
+    const c = cards.find(a => a.dataset.id === last); if (c) c.focus({ preventScroll: true });
   }
   function open(id, fromMap) {
     const n = byId.get(id); if (!n) return;
     const first = !shown; shown = id;
+    if (first) gridY = scrollY;
     document.body.classList.add("split-on"); $("split").hidden = false; $("grid").hidden = true; document.querySelector(".fh").hidden = true;
     document.title = n.name + " · DataUX";
     if (!fromMap) {
-      if (first || !map.contentWindow || !map.src) map.src = "embed.html?iso#" + n.id;
+      if (first || !map.src) { map.classList.remove("ready"); map.src = "embed.html?iso#" + n.id; }
       else try { map.contentWindow.location.replace("embed.html?iso#" + n.id); } catch (e) { map.src = "embed.html?iso#" + n.id; }
     }
     const f = $("fiche");
-    f.innerHTML = head(n) + `<div class="skel"></div><div class="skel"></div><div class="skel short"></div>`;
+    f.innerHTML = head(n) + `<div class="fc"><div class="skel"></div><div class="skel"></div><div class="skel short"></div></div>`;
     bind(f); f.scrollTop = 0;
     if (cache.has(id)) return render(n, cache.get(id));
     if (req) req.abort(); req = new AbortController();
     fetch("data/fiches/" + id + ".json", { signal: req.signal }).then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(j => { cache.set(id, j); if (shown === id) render(n, j); })
-      .catch(e => { if (e && e.name === "AbortError") return; if (shown === id) { f.innerHTML = head(n) + `<p class="muted">Le contenu de cette fiche ne se charge pas.</p>`; bind(f); } });
+      .catch(e => { if (e && e.name === "AbortError") return; if (shown === id) f.querySelector(".fc").innerHTML = `<p class="muted">Le contenu de cette fiche ne se charge pas.</p>`; });
   }
   const head = n => `<a class="back" href="#">← Toutes les fiches</a>
     <p class="ct">${sw(n.type)}${esc(TYPES[n.type].one || TYPES[n.type].label)}${n.cat ? " · " + esc(n.cat) : ""}</p>
@@ -87,11 +111,11 @@ function init(G) {
     const props = j.props && j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
     const rs = RES.filter(r => r.liees.includes(n.id));
     const resH = rs.length ? `<h4>Ressources</h4><ul class="res">${rs.map(r => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)} ↗</a></li>`).join("")}</ul>` : "";
-    f.innerHTML = head(n) + props + `<div class="body">${j.html && j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`}</div>` + resH;
-    bind(f); f.scrollTop = 0;
+    f.querySelector(".fc").innerHTML = props + `<div class="body">${j.html && j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`}</div>` + resH;
+    bind(f);
   }
   function bind(f) {
-    f.querySelector(".back").onclick = e => { e.preventDefault(); history.pushState(null, "", location.pathname + location.search); close(); };
+    f.querySelector(".back").onclick = e => { e.preventDefault(); history.pushState(null, "", location.pathname + location.search); closeAnim(); };
     f.querySelectorAll("[data-id]").forEach(b => { const n = byId.get(b.dataset.id);
       if (n) b.onclick = () => { history.pushState(null, "", "#" + n.anchor); open(n.id); }; else b.replaceWith(...b.childNodes); });
   }

@@ -20,14 +20,21 @@ a{color:inherit}
 .n{grid-column:1/-1;margin:4px 0 0;color:var(--text-muted);font-size:12px}
 
 /* Cartes */
-.grid{max-width:1280px;margin:0 auto;padding:8px 24px 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.grid{max-width:1280px;margin:0 auto;padding:8px 24px 40px}
+.fam{margin:18px 0 0}
+.fam[hidden]{display:none}
+.fam h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;font-weight:600}
+.fam h2 .sw{width:11px;height:11px}
+.fc-n{font-weight:400;color:var(--text-muted);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .grid[hidden]{display:none}
-.card{display:flex;flex-direction:column;gap:6px;min-height:104px;padding:12px 14px;background:var(--paper);border:1px solid var(--line);border-radius:10px;text-decoration:none;transition:border-color .12s}
+.card{display:flex;flex-direction:column;gap:6px;min-height:84px;padding:12px 14px;background:var(--paper);background:color-mix(in srgb,var(--c) 5%,var(--paper));border:1px solid var(--line);border-radius:10px;text-decoration:none;transition:border-color .12s}
 .card:hover{border-color:var(--line-strong)}
 .card[hidden]{display:none}
 .ct{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-muted);margin:0}
 .cn{font-size:15px;font-weight:600;line-height:1.3}
 .cm{margin-top:auto;font-size:11.5px;color:var(--text-muted)}
+.card:hover{background:color-mix(in srgb,var(--c) 9%,var(--paper))}
 .empty{grid-column:1/-1;color:var(--text-muted)}
 
 /* Pastilles : même forme que sur la carte */
@@ -65,8 +72,43 @@ body.split-on{overflow:hidden}
 @media (max-width:760px){
   .fh{grid-template-columns:1fr;padding:16px}
   .fh .q input{width:100%}
-  .grid{padding:8px 16px 32px;grid-template-columns:1fr 1fr}
+  .grid{padding:8px 16px 32px}
+  .cards{grid-template-columns:1fr 1fr}
   .split{grid-template-columns:1fr;grid-template-rows:55% 45%}
   .fiche{border-right:0;border-bottom:1px solid var(--line);padding:16px}
   .fiche .props{grid-template-columns:1fr;gap:0}
+}
+
+/* Mouvement (20/11/2026) : la carte cliquée devient le panneau de la fiche, la carte du réseau glisse depuis la droite */
+.split:not([hidden]) .fiche{view-transition-name:fiche}
+.split:not([hidden]) .map{view-transition-name:reseau}
+::view-transition-group(fiche){animation-duration:.45s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
+/* Le cadre s'agrandit ; les contenus gardent leur taille (pas d'étirement), l'ancien s'efface, le nouveau apparaît */
+::view-transition-group(fiche){overflow:hidden;border-radius:10px}
+::view-transition-old(fiche),::view-transition-new(fiche){width:auto;height:auto;object-fit:none;object-position:top left;inset:0 auto auto 0}
+::view-transition-old(fiche){animation:vtout .15s ease both}
+::view-transition-new(fiche){animation:vtin .3s .08s ease both}
+@keyframes vtout{to{opacity:0}}
+@keyframes vtin{from{opacity:0}}
+::view-transition-new(reseau){animation:mapin .5s .08s cubic-bezier(.2,.8,.2,1) both}
+::view-transition-old(reseau){animation:mapout .25s ease both}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.3s}
+@keyframes mapin{from{opacity:0;transform:translateX(40px)}}
+@keyframes mapout{to{opacity:0;transform:translateX(40px)}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+/* Contenu de la fiche : apparaît en douceur à chaque fiche ouverte */
+.fiche .ct,.fiche h1{animation:rise .35s cubic-bezier(.2,.8,.2,1) both}
+.fiche h1{animation-delay:.03s}
+.fc>*{animation:rise .4s .06s cubic-bezier(.2,.8,.2,1) both}
+.map iframe{opacity:0;transition:opacity .45s ease}
+.map iframe.ready{opacity:1}
+/* Navigateurs sans View Transitions : le panneau et la carte glissent en place */
+@supports not (view-transition-name:a){
+  .split:not([hidden]) .fiche{animation:fichein .4s cubic-bezier(.2,.8,.2,1) both}
+  .split:not([hidden]) .map{animation:mapin .5s .08s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes fichein{from{opacity:0;transform:translateX(-24px)}}
+}
+@media (prefers-reduced-motion:reduce){
+  *,::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important;transition:none!important}
+  .map iframe{opacity:1}
 }
