@@ -91,7 +91,9 @@ function init(G) {
     document.body.classList.add("split-on"); $("split").hidden = false; $("grid").hidden = true; document.querySelector(".fh").hidden = true;
     document.title = n.name + " · DataUX";
     if (!fromMap) {
-      if (first || !map.src) { map.classList.remove("ready"); map.src = "embed.html?iso#" + n.id; }
+      // La carte n'est chargée qu'une fois : ensuite on change seulement de fiche (un changement d'adresse
+      // limité au # ne recharge pas la page, donc pas d'événement load : la carte doit rester visible)
+      if (!map.getAttribute("src")) map.src = "embed.html?iso#" + n.id;
       else try { map.contentWindow.location.replace("embed.html?iso#" + n.id); } catch (e) { map.src = "embed.html?iso#" + n.id; }
     }
     const f = $("fiche");
