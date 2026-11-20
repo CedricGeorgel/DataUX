@@ -299,7 +299,7 @@ async function fiche(id, page, contributors) {
 const t0 = Date.now();
 // Numéro de version dans les pages : après chaque publication, les navigateurs rechargent le code
 const V = (process.env.GITHUB_SHA || String(Date.now())).slice(0, 8);
-for (const f of ["index.html", "embed.html"]) {
+for (const f of ["index.html", "embed.html", "fiches.html"]) {
   const file = path.join(OUT, "..", f);
   const html = await fs.readFile(file, "utf8").catch(() => null);
   if (html) await fs.writeFile(file, html.replace(/(assets\/[\w.-]+\.(?:js|css))(\?v=[\w]+)?/g, `$1?v=${V}`));
