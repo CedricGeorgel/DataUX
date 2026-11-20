@@ -113,8 +113,31 @@ function init(G) {
     const props = j.props && j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
     const rs = RES.filter(r => r.liees.includes(n.id));
     const resH = rs.length ? `<h4>Ressources</h4><ul class="res">${rs.map(r => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)} ↗</a></li>`).join("")}</ul>` : "";
-    f.querySelector(".fc").innerHTML = props + `<div class="body">${j.html && j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`}</div>` + resH;
+    // Contributeurs (comme sur la carte) : un nom connu s'ouvre sur sa présentation, sous la liste
+    const who = j.contributors && j.contributors.length ? j.contributors.map(c => typeof c === "string" ? esc(c)
+      : people.has(c.id) ? `<button class="lnk" data-person="${esc(c.id)}" aria-expanded="false">${esc(c.name)}</button>` : esc(c.name)).join(", ")
+      : `<span class="muted">Personne pour l'instant</span>`;
+    const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.anchor;
+    const acts = [F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
+      F.proposition ? `<a class="btn" href="${esc(formUrl(F.proposition, { liee: n.name }))}" target="_blank" rel="noopener noreferrer">Proposer une fiche liée</a>` : ""].join("");
+    const contrib = `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p><div id="person"></div>${acts ? `<p class="acts">${acts}</p>` : ""}</div>`;
+    f.querySelector(".fc").innerHTML = props + `<div class="body">${j.html && j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`}</div>` + resH + contrib;
+    f.querySelectorAll("[data-person]").forEach(b => b.onclick = () => {
+      const open = b.getAttribute("aria-expanded") !== "true";
+      f.querySelectorAll("[data-person]").forEach(x => x.setAttribute("aria-expanded", "false"));
+      $("person").innerHTML = open ? person(people.get(b.dataset.person)) : ""; b.setAttribute("aria-expanded", open); });
     bind(f);
+  }
+  const people = new Map((G.people || []).map(p => [p.id, p]));
+  function formUrl(base, params) { const u = new URL(base); for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v); return u.toString(); }
+  function person(p) {
+    const ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
+    const photo = p.photo ? `<img class="pphoto" src="${esc(p.photo)}" alt="">` : `<span class="pphoto ini" aria-hidden="true">${esc(ini)}</span>`;
+    const links = (p.links || []).map(l => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("");
+    return `<div class="pcard"><div class="phead">${photo}<div><div class="pname">${esc(p.name)}</div>
+      ${p.job ? `<div class="muted">${esc(p.job)}</div>` : ""}${p.formation ? `<div class="muted">Formation : ${esc(p.formation)}</div>` : ""}</div></div>
+      ${links ? `<p class="acts">${links}</p>` : ""}${p.bio ? `<div class="pbio">${p.bio}</div>` : ""}
+      <p class="muted">${(p.fiches || []).length} fiche${(p.fiches || []).length > 1 ? "s" : ""} relue${(p.fiches || []).length > 1 ? "s" : ""}</p></div>`;
   }
   function bind(f) {
     f.querySelector(".back").onclick = e => { e.preventDefault(); history.pushState(null, "", location.pathname + location.search); closeAnim(); };

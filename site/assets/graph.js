@@ -448,17 +448,9 @@ function init(G) {
     return `<button class="theme" role="switch" aria-checked="${d}" data-theme-switch><span class="trk" aria-hidden="true"></span>Mode sombre</button>`; };
   function renderPanel() {
     if (!panel) return;
-    if (!state.focus && state.panel === "res") {
-      const ord = G.resThemes || [], rank = k => { const i = ord.indexOf(k); return i < 0 ? ord.length : i; };
-      const kinds = [...new Set(RES.map(r => r.kind || "Autres"))].sort((a, b) => (a === "Autres") - (b === "Autres") || rank(a) - rank(b) || a.localeCompare(b, "fr"));
-      panel.innerHTML = grab() + `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
-        <h1 style="margin-top:12px">Ressources</h1>
-        ${kinds.map(k => { const rs = RES.filter(r => (r.kind || "Autres") === k);
-          return `<h3>${esc(k)} · ${rs.length}</h3><ul class="links">${rs.map(r => `<li><span class="sw res"></span><button class="lnk" data-res="${esc(r.id)}">${esc(r.name)}</button></li>`).join("")}</ul>`; }).join("")}
-        <div class="pfoot">${themeSwitch()}</div>`;
-    } else if (state.focus) { const n = byId.get(state.focus);
+    if (state.focus) { const n = byId.get(state.focus);
       const groups = {}; [...n.nb].map(i => byId.get(i)).forEach(m => { (groups[m.type] = groups[m.type] || []).push(m); });
-      let h = `<button class="lnk back" data-back="1">← ${state.panel === "res" ? "Ressources" : "Vue d'ensemble"}</button>
+      let h = `<button class="lnk back" data-back="1">← Vue d'ensemble</button>
         <h1 style="margin-top:12px">${esc(n.name)}</h1>
         <p><span class="tag" style="border-color:${color(n)}">${esc(TYPES[n.type].label)}</span>${n.cat ? `<span class="tag">${esc(n.cat)}</span>` : ""}</p>
         <h2>${n.deg} lien${n.deg > 1 ? "s" : ""}</h2>`;
@@ -686,18 +678,6 @@ function init(G) {
     const p = store.get("reseau-legend-pos");
     if (p && innerWidth > 760) { lw.style.left = Math.min(Math.max(0, p.x), innerWidth - 120) + "px"; lw.style.top = Math.min(Math.max(0, p.y), innerHeight - 44) + "px"; lw.style.bottom = "auto"; lw.style.right = "auto"; }
     draggable(lw, "reseau-legend-pos");
-  }
-
-  // ---------- Bouton Ressources : ouvre directement la liste dans le panneau (page complète)
-  if (FULL && RES.length) {
-    const rbtn = $("resBtn");
-    rbtn.hidden = false;
-    rbtn.onclick = () => {
-      if (state.focus) select(null);
-      state.panel = "res";
-      if (document.body.classList.contains("nopanel")) $("panelBtn").click(); else renderPanel();
-      const first = panel.querySelector("[data-res]"); if (first && !MOB()) first.focus({ preventScroll: true });
-    };
   }
 
   // ---------- Lancement

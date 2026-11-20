@@ -1168,25 +1168,9 @@
   });
   document.body.insertBefore(bar, document.body.firstChild);
   var msg = bar.querySelector(".msg");
-  // Retour vers la ou les fiches DataUX dont est tirée la ressource (lues dans les données de la carte)
-  var back = mk("span", "tb-back");
-  var backLink = function (href, label) { var a = mk("a", "tb-link"); a.href = href; a.target = "_top"; a.textContent = label; return a; };
-  back.appendChild(backLink("../", "← DataUX"));
+  // Retour simple vers la ressource dans la vue Ressources du site (pleine page seulement : l'aperçu n'a pas de barre)
+  var back = mk("a", "tb-link tb-back"); back.href = "../ressources.html#" + (slug === "grille-de-prise-de-notes" ? "guide-d-entretien-utilisateur" : slug); back.target = "_top"; back.textContent = "← Retour";
   bar.insertBefore(back, bar.firstChild);
-  if (window.fetch) fetch("../data/graph.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (G) {
-    if (!G || !G.ressources || !G.nodes) return;
-    var here = location.pathname.split("/").pop();
-    var res = G.ressources.filter(function (r) { return String(r.url || "").split(/[?#]/)[0].split("/").pop() === here; })[0];
-    if (!res || !res.liees || !res.liees.length) return;
-    var by = {}; G.nodes.forEach(function (n) { by[n.id] = n; });
-    var ls = res.liees.map(function (i) { return by[i]; }).filter(Boolean);
-    if (!ls.length) return;
-    back.textContent = "← ";
-    ls.forEach(function (n, i) {
-      if (i) back.appendChild(document.createTextNode(" · "));
-      var a = backLink("../#" + n.id, n.name); a.title = "Ouvrir la fiche « " + n.name + " » dans DataUX"; back.appendChild(a);
-    });
-  }).catch(function () {});
   // Consentement : sous la fiche, créer le lien (organisateur) ou envoyer le formulaire signé (participant)
   if (CONSENT) {
     var cb = mk("div", "tb-below consent"), note = mk("p", "consent-note"), go = mk("button", "btn-note");

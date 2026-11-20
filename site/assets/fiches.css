@@ -113,15 +113,29 @@ body.split-on{overflow:hidden}
   .map iframe{opacity:1}
 }
 
-/* Page Ressources : aperçu du template à droite, boutons d'action */
+/* Page Ressources : boutons d'action */
 .sw.res{width:9px;height:9px;border-radius:2px;background:var(--accent)}
 .acts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
 .btn{display:inline-flex;align-items:center;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);text-decoration:none;font-size:12.5px}
 .btn:hover{border-color:var(--line-strong)}
 .btn.main{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-.tpl{background:var(--surface);overflow:hidden}
-.tpl iframe{inset:auto;left:0;top:0;transform-origin:0 0;background:#fff}
-.tpl iframe[hidden]{display:none}
-.ext{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-muted);padding:24px;text-align:center}
-.ext[hidden]{display:none}
 .res-page .card{min-height:72px}
+
+/* Images du mode d'emploi : elles suivent la largeur du panneau, jamais l'inverse */
+.fiche{min-width:0}
+.fiche figure{margin:14px 0}
+.fiche img{display:block;max-width:100%;height:auto;border-radius:6px;border:1px solid var(--line)}
+.fiche .body{overflow-wrap:anywhere}
+/* Page Ressources : la ressource ouverte prend toute la page, texte centré à largeur de lecture */
+.split.solo:not([hidden]){display:block}
+.split.solo .fiche{height:100%;border-right:0;padding:24px max(28px,calc((100% - 760px) / 2)) 64px}
+/* Contributeurs dans la vue fiche */
+.contrib{margin-top:24px;padding-top:14px;border-top:1px solid var(--line)}
+.contrib h4{margin:0 0 6px}
+.contrib .acts{margin-top:12px}
+.pcard{margin:10px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.phead{display:flex;gap:12px;align-items:center}
+.pphoto{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;border:0}
+.pphoto.ini{display:inline-flex;align-items:center;justify-content:center;background:var(--line);color:var(--ink);font-weight:600;font-size:14px}
+.pname{font-weight:600;font-size:14px}
+.pbio{margin-top:8px;font-size:13px}

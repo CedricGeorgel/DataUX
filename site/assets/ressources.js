@@ -1,5 +1,5 @@
 // Page « Ressources » : les templates en cartes, classés par thème. Une ressource ouverte scinde la page :
-// à gauche sa fiche (mode d'emploi, liens), à droite l'aperçu du template, réduit à la largeur du panneau.
+// Une ressource ouverte prend toute la page : boutons du template, mode d'emploi, fiches liées.
 (function () {
 "use strict";
 const $ = id => document.getElementById(id);
@@ -40,15 +40,9 @@ function init(G) {
   $("q").addEventListener("input", filter); filter();
 
   // ---------- Vue scindée
-  const tpl = $("tpl"), box = $("tplBox"), cache = new Map(); let shown = null, req = null, gridY = 0;
+  const cache = new Map(); let shown = null, req = null, gridY = 0;
   const RM = matchMedia("(prefers-reduced-motion: reduce)");
   const canVT = () => !RM.matches && !!document.startViewTransition;
-  // Le template (A4 paysage, 1123 px) est affiché en entier dans le panneau : on le réduit à sa largeur
-  const W = 1200;
-  function fit() { const k = Math.min(1, box.clientWidth / W);
-    tpl.style.width = W + "px"; tpl.style.height = (box.clientHeight / k) + "px"; tpl.style.transform = `scale(${k})`; }
-  addEventListener("resize", () => { if (shown) fit(); });
-  tpl.addEventListener("load", () => tpl.classList.add("ready"));
   function openAnim(a, card) {
     if (!canVT()) return open(a);
     if (card) card.style.viewTransitionName = "fiche";
@@ -79,11 +73,6 @@ function init(G) {
     if (!shown) gridY = scrollY; shown = a;
     document.body.classList.add("split-on"); $("split").hidden = false; $("grid").hidden = true; document.querySelector(".fh").hidden = true;
     document.title = r.name + " · DataUX";
-    // Aperçu à droite : le template du site, ou un lien pour une ressource hébergée ailleurs
-    if (own(r)) { $("ext").hidden = true; tpl.hidden = false; fit();
-      if (tpl.getAttribute("src") !== local(r)) { tpl.classList.remove("ready"); tpl.src = local(r); } }
-    else { tpl.hidden = true; tpl.removeAttribute("src"); $("ext").hidden = false;
-      $("ext").innerHTML = `<p>Ce template est hébergé ailleurs.</p><a class="btn" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Ouvrir ${esc(r.name)} ↗</a>`; }
     const f = $("fiche");
     f.innerHTML = head(r) + `<div class="fc"><div class="skel"></div><div class="skel"></div><div class="skel short"></div></div>`;
     bind(f); f.scrollTop = 0;
