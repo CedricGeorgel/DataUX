@@ -1110,7 +1110,11 @@
     recalc();
     clearTimeout(timer);
     timer = setTimeout(function () {
-      var data = { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }),
+      try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
+    }, 300);
+  }
+  function snapshot() {
+      return { v: 2, e: eds.map(function (el) { return el.innerHTML; }), c: checks.map(function (el) { return el.getAttribute("aria-checked") === "true"; }),
         m: emos.map(function (el) { return el.textContent; }),
         p: notes.map(function (n) { return { x: n.offsetLeft, y: n.offsetTop, t: n.querySelector(".pi-t").innerHTML }; }),
         ph: photo,
@@ -1119,8 +1123,6 @@
         k: links.map(function (l) { return [notes.indexOf(l.a), notes.indexOf(l.b), l.t]; }),
         g: sigs.map(function (s) { return s.get(); }),
         h: pzTitles.map(function (s) { return s.textContent; }), x: pzHide };
-      try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (err) { /* stockage indisponible : la fiche marche quand même */ }
-    }, 300);
   }
   function restore() {
     try {
@@ -1146,6 +1148,8 @@
   var bar = mk("div", "tb");
   bar.innerHTML = '<button type="button" data-a="png">Enregistrer en image</button>' +
     '<button type="button" data-a="print">Imprimer / PDF</button>' +
+    '<button type="button" data-a="save" title="Télécharger un fichier .dataux avec tout ce qui est saisi">Sauvegarder</button>' +
+    '<button type="button" data-a="open" title="Reprendre une fiche à partir d\'un fichier .dataux">Ouvrir</button>' +
     '<button type="button" data-a="clear">Tout effacer</button>' +
     '<a class="tb-link" href="' + location.pathname + '?papier" target="_blank" rel="noopener">Version papier vierge ↗</a>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
@@ -1197,6 +1201,36 @@
       try { localStorage.removeItem(KEY); } catch (err) {}
       location.reload();
     } else if (a === "png") exportPng(b);
+    else if (a === "save") saveFile();
+    else if (a === "open") picker.click();
+  });
+  /* 7. Sauvegarde dans un fichier .dataux (JSON) : à garder sur son ordinateur, à rouvrir plus tard ou ailleurs */
+  var picker = mk("input"); picker.type = "file"; picker.accept = ".dataux,.json,application/json"; picker.hidden = true;
+  document.body.appendChild(picker);
+  function saveFile() {
+    var now = new Date(), day = now.toISOString().slice(0, 10);
+    var file = { format: "dataux-fiche", version: 1, fiche: slug, titre: (root.querySelector("h1") || {}).textContent || slug,
+      enregistre: now.toISOString(), donnees: snapshot() };
+    var url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: "application/json" }));
+    var a = mk("a"); a.href = url; a.download = slug + "-" + day + ".dataux";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    msg.textContent = "Fichier enregistré dans vos téléchargements";
+  }
+  picker.addEventListener("change", function () {
+    var f = picker.files && picker.files[0]; picker.value = ""; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var file;
+      try { file = JSON.parse(r.result); } catch (err) { file = null; }
+      if (!file || file.format !== "dataux-fiche" || !file.donnees || file.donnees.v !== 2) { msg.textContent = "Ce fichier n'est pas une sauvegarde DataUX."; return; }
+      if (file.fiche !== slug) { msg.textContent = "Ce fichier est une sauvegarde de « " + (file.titre || file.fiche) + " », pas de cette fiche."; return; }
+      if (!confirm("Remplacer ce qui est saisi sur cette fiche par le contenu du fichier ?")) return;
+      try { localStorage.setItem(KEY, JSON.stringify(file.donnees)); } catch (err) { msg.textContent = "Le navigateur refuse d'enregistrer : fichier trop lourd ou stockage désactivé."; return; }
+      location.reload();
+    };
+    r.onerror = function () { msg.textContent = "Le fichier n'a pas pu être lu."; };
+    r.readAsText(f);
   });
   function exportPng(btn) {
     if (!window.htmlToImage) { msg.textContent = "Export indisponible"; return; }
