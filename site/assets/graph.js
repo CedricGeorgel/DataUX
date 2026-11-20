@@ -339,6 +339,8 @@ function init(G) {
     const onCircle = (b, id, only) => circles.some(c => c.id !== id && (!only || only.has(c.id)) && b[0] < c.b[2] && b[2] > c.b[0] && b[1] < c.b[3] && b[3] > c.b[1]);
     const txt = nodeSel.select("text");
     if (state.focus && state.ring) { txt.style("display", d => d.ring ? null : "none"); placeLabels(); return; }
+    // Dézoom maximal : aucun nom, la carte se lit comme une forme
+    if (k < .2) { txt.style("display", "none"); return; }
     const fs = 11 / k, h = fs * 1.2, gap = 3 / k;
     const place = new Map();
     const minDeg = k < 0.55 ? 9 : k < 0.8 ? 6 : k < 1.1 ? 4 : k < 1.5 ? 2 : k < 2 ? 1 : 0;
