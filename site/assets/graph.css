@@ -341,3 +341,19 @@ body:not(.embed) .views{position:fixed;top:12px;left:12px;z-index:7}
   .legend-win{top:100px!important}
   .res-btn,body.nopanel .res-btn{top:100px}
 }
+/* Vues isolées : tiges des fleurs (cœur au nom de la famille), avatar du contributeur */
+.iso{pointer-events:none}
+.iso .stem{stroke:var(--line-strong);stroke-width:.7;opacity:.4}
+.iso .stem.main{stroke-width:1.6;opacity:.5}
+.iso .stem.conf{stroke:var(--conf);opacity:.9;stroke-width:1.2}
+/* Vue isolée : fond légèrement flou pour lire les liens */
+.iso-on .deco,.iso-on .node.dim,.iso-on .edge.dim{filter:blur(1.4px)}
+.iso .heart text{font:600 20px Inter,system-ui,sans-serif;paint-order:stroke;stroke:var(--surface);stroke-width:5px}
+.person{pointer-events:none}
+.person .pav{fill:var(--paper);stroke:var(--accent);stroke-width:2}
+.person .pini{font:600 20px Inter,system-ui,sans-serif;fill:var(--ink)}
+.person .pnm{font:600 14px Inter,system-ui,sans-serif;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+/* Fiches relues d'un contributeur, par base (commun.js) */
+.pgrp{display:flex;align-items:center;gap:6px;margin:10px 0 4px;font-size:12.5px}
+.plist{margin:0;padding:0;list-style:none}
+.plist li{padding:2px 0}

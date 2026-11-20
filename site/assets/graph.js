@@ -11,7 +11,8 @@ const API_GRAPH = "data/graph.json";
 const API_FICHE = id => "data/fiches/" + id + ".json";
 const BIG = "index.html";
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Briques communes aux pages (commun.js) : texte, adresses lisibles, formes, contenu des fiches
+const U = window.DataUX, esc = U.esc;
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
                 set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
 // Thème choisi dans le panneau (clair ou sombre). Sans choix, le site suit le réglage de l'appareil.
@@ -50,16 +51,8 @@ function init(G) {
   G.edges.forEach(([a, b]) => { byId.get(a).nb.add(b); byId.get(b).nb.add(a); });
   G.conf.forEach(([a, b]) => { byId.get(a).sug.add(b); byId.get(b).sug.add(a); });
   G.nodes.forEach(n => n.deg = n.nb.size);
-  // Adresse lisible de chaque fiche (#persona). Deux fiches au même nom : la base est ajoutée à la seconde.
-  const fold = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const bySlug = new Map();
-  G.nodes.slice().sort((a, b) => b.deg - a.deg || (a.id < b.id ? -1 : 1)).forEach(n => {
-    let s = fold(n.name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || n.id;
-    if (bySlug.has(s)) s += "-" + n.type; if (bySlug.has(s)) s += "-" + n.id.slice(0, 4);
-    n.anchor = s; bySlug.set(s, n.id); });
-  // Accepte aussi les anciens liens (#identifiant Notion)
-  const fromHash = h => { try { h = decodeURIComponent(h || "").toLowerCase(); } catch (e) { return null; }
-    if (bySlug.has(h)) return bySlug.get(h); h = h.replace(/-/g, ""); return byId.has(h) ? h : null; };
+  // Adresses lisibles (#persona), pastilles, contenu des fiches : préparés par commun.js
+  const D = U.data(G), fromHash = D.fromHash;
 
   // ---------- Densité des liens selon le zoom
   // Chaque fiche classe ses liens du plus fort au plus faible : voisins communs, même groupe,
@@ -96,7 +89,7 @@ function init(G) {
   const state = { ring: false, types: new Set(typeKeys.filter(t => LOCK || !HIDDEN.includes(t))), showIso: true, showSug: true, focus: null, panel: null };
   const color = n => TYPES[n.type].color;
   // Une forme par base, en plus de la couleur (lisible sans la couleur). Les deux plus grosses bases restent rondes ou presque.
-  const SHAPE = { biais: "circle", glossaire: "square", kpi: "diamond", loi: "triangle", methode: "hexagon", framework: "pentagon", acteur: "tridown", biblio: "book" };
+  const SHAPE = U.SHAPE;
   const shapeOf = t => SHAPE[t] || "circle";
   const poly = (k, R, a0) => "M" + Array.from({ length: k }, (_, i) => { const a = (a0 + 360 * i / k) * Math.PI / 180; return (R * Math.cos(a)).toFixed(2) + "," + (R * Math.sin(a)).toFixed(2); }).join("L") + "Z";
   function shapeD(s, r) {
@@ -261,9 +254,12 @@ function init(G) {
       visNodes = visNodes.filter(n => keep.has(n.id));
       // Les nouvelles voisines partent du centre de la fiche : la couronne s'ouvre au lieu d'apparaître d'un coup
       visNodes.forEach(n => { if (!before.has(n.id) && n !== f) { n.x = f.x + (Math.random() - .5) * 4; n.y = f.y + (Math.random() - .5) * 4; } }); }
+    if (LOCK && state.person) { const P = new Set(peopleById.get(state.person).fiches);
+      visNodes = G.nodes.filter(n => P.has(n.id));
+      visNodes.forEach(n => { if (!before.has(n.id)) { n.x = (Math.random() - .5) * 4; n.y = (Math.random() - .5) * 4; } }); }
     const vis = new Set(visNodes.map(n => n.id));
-    visEdges = G.edges.filter(([a, b]) => vis.has(a) && vis.has(b)).map(([a, b]) => ({ source: a, target: b, sug: false }));
-    if (state.showSug) G.conf.forEach(([a, b]) => { if (vis.has(a) && vis.has(b)) visEdges.push({ source: a, target: b, sug: true }); });
+    visEdges = LOCK && state.person ? [] : G.edges.filter(([a, b]) => vis.has(a) && vis.has(b)).map(([a, b]) => ({ source: a, target: b, sug: false }));
+    if (state.showSug && !(LOCK && state.person)) G.conf.forEach(([a, b]) => { if (vis.has(a) && vis.has(b)) visEdges.push({ source: a, target: b, sug: true }); });
     edgeSel = gEdges.selectAll("line").data(visEdges, d => (d.source.id || d.source) + (d.target.id || d.target) + d.sug)
       .join("line").attr("class", d => "edge" + (d.sug ? " sug" : "") + (!d.sug && !sameComm(d.source, d.target) ? " cross" : ""));
     nodeSel = gNodes.selectAll("g.node").data(visNodes, d => d.id).join(enter => {
@@ -319,26 +315,72 @@ function init(G) {
       .style("font-weight", d => d.ring === "C" ? 600 : null)
       .style("font-size", d => d.ring === "C" ? "13px" : "10.5px");
   }
-  function releaseRing() { G.nodes.forEach(n => { if (n.ring) { n.ring = null; n.fx = null; n.fy = null; } }); }
-  function buildRing(f) {
-    const vis = new Set(visNodes.map(n => n.id));
-    const nbs = [...new Set([...f.nb, ...(state.showSug ? f.sug : [])])].map(i => byId.get(i)).filter(n => vis.has(n.id))
-      .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
-    const half = Math.ceil(nbs.length / 2), sides = [["R", nbs.slice(0, half)], ["L", nbs.slice(half)]];
-    const STEP = 22; let maxH = 0, R = 150;
-    sides.forEach(([, arr]) => { const H = (arr.length - 1) * STEP; maxH = Math.max(maxH, H); R = Math.max(R, H / 2 + 48); });
-    const targets = [];
-    f.ring = "C"; targets.push([f, f.x, f.y, f.x, f.y]);
-    sides.forEach(([side, arr]) => { const H = (arr.length - 1) * STEP, sx = side === "R" ? 1 : -1;
-      arr.forEach((n, i) => { const y = -H / 2 + i * STEP, x = sx * Math.sqrt(Math.max(R * R - y * y, (R * 0.35) ** 2));
-        n.ring = side; targets.push([n, n.x, n.y, f.x + x, f.y + y]); }); });
-    f.fx = f.x; f.fy = f.y;
-    d3.transition().duration(450).ease(d3.easeCubicOut).tween("ring", () => t => {
+  function releaseRing() { clearIso(); G.nodes.forEach(n => { if (n.ring) { n.ring = null; n.fx = null; n.fy = null; } }); }
+  // ---------- Vues isolées : la fiche (ou le contributeur) au centre, ses voisines autour.
+  // Jusqu'à FLOWER voisines : une couronne (noms à droite et à gauche, familles légèrement écartées).
+  // Au-delà : une fleur par famille, en petite couronne autour d'un cœur à son nom ; les fleurs entourent le centre.
+  // Le fond (fiches hors de la vue, décor) est légèrement flouté pour lire les liens.
+  const FLOWER = 24, STEP = 22;
+  const byName = (a, b) => a.name.localeCompare(b.name, "fr");
+  let gIso = null, stems = null;
+  function clearIso() { if (gIso) gIso.remove(); gIso = null; stems = null; gEdges.style("display", null); svg.classed("iso-on", false); }
+  // Couronne : moitié à droite, moitié à gauche, un petit écart entre deux familles, points jamais superposés
+  function crown(arr, minR) {
+    const half = Math.ceil(arr.length / 2), sides = [["R", arr.slice(0, half)], ["L", arr.slice(half)]], GAP = 12;
+    // L'écart entre deux points suit leur taille : jamais de chevauchement, même pour les grosses fiches
+    const ys = sides.map(([, a]) => { let y = 0; return a.map((n, i) => {
+      if (i) y += Math.max(STEP, rad(a[i - 1]) + rad(n) + 5) + (n.type !== a[i - 1].type ? GAP : 0); return y; }); });
+    let maxH = 0, R = minR; ys.forEach(Y => { const H = Y.length ? Y[Y.length - 1] : 0; maxH = Math.max(maxH, H); R = Math.max(R, H / 2 + 40); });
+    const pos = [];
+    sides.forEach(([side, a], k) => { const Y = ys[k], H = Y.length ? Y[Y.length - 1] : 0, sx = side === "R" ? 1 : -1;
+      a.forEach((n, i) => { const y = Y[i] - H / 2, x = sx * Math.sqrt(Math.max(R * R - y * y, (R * .35) ** 2)); pos.push([n, side, x, y]); }); });
+    return { pos, R, H: maxH };
+  }
+  // groups : [{ label, color, nodes }] ; conf : fiches « à ne pas confondre » (tige rouge dans les fleurs)
+  // Renvoie la taille occupée { w, h } pour cadrer le zoom
+  function layoutIso(cx, cy, groups, center, withStems, conf) {
+    clearIso();
+    const all = groups.flatMap(g => g.nodes), targets = [], petals = [];
+    gIso = root.insert("g", () => gNodes.node()).attr("class", "iso");
+    let w, h;
+    svg.classed("iso-on", true);
+    if (all.length <= FLOWER) {
+      const c = crown(all, 150);
+      c.pos.forEach(([n, side, x, y]) => { n.ring = side; targets.push([n, n.x, n.y, cx + x, cy + y]); if (withStems) petals.push({ x: cx, y: cy, n }); });
+      w = 2 * c.R + 360; h = c.H + 60;
+    } else {
+      gEdges.style("display", "none");
+      const fl = groups.map(g => { const c = crown(g.nodes, 46); return { g, c, D: Math.max(2 * c.R + 300, c.H + 110) }; });
+      const tot = fl.reduce((s, f) => s + f.D + 30, 0), maxD = d3.max(fl, f => f.D);
+      const R = Math.max(maxD / 2 + 160, tot / (2 * Math.PI)); let a = -Math.PI / 2;
+      fl.forEach(f => {
+        const da = 2 * Math.PI * (f.D + 30) / tot, ang = a + da / 2; a += da;
+        const hx = cx + Math.cos(ang) * R, hy = cy + Math.sin(ang) * R;
+        gIso.append("line").attr("class", "stem main").attr("x1", cx).attr("y1", cy).attr("x2", hx).attr("y2", hy).style("stroke", f.g.color);
+        f.c.pos.forEach(([n, side, x, y]) => { n.ring = side; targets.push([n, n.x, n.y, hx + x, hy + y]); petals.push({ x: hx, y: hy, n, conf: !!(conf && conf.has(n.id)) }); });
+        const hg = gIso.append("g").attr("class", "heart").attr("transform", `translate(${hx},${hy})`);
+        hg.append("circle").attr("r", 6).style("fill", f.g.color);
+        hg.append("text").attr("y", -f.c.H / 2 - 28).attr("text-anchor", "middle").text(`${f.g.label} · ${f.g.nodes.length}`).style("fill", f.g.color);
+      });
+      w = h = 2 * (R + maxD / 2);
+    }
+    stems = gIso.selectAll("line.petal").data(petals).join("line").attr("class", d => "stem petal" + (d.conf ? " conf" : ""))
+      .attr("x1", d => d.x).attr("y1", d => d.y).attr("x2", d => d.n.x).attr("y2", d => d.n.y);
+    if (center) { center.ring = "C"; center.fx = cx; center.fy = cy; }
+    d3.transition().duration(all.length > FLOWER ? 650 : 450).ease(d3.easeCubicOut).tween("ring", () => t => {
       targets.forEach(([n, x0, y0, x1, y1]) => { n.fx = x0 + (x1 - x0) * t; n.fy = y0 + (y1 - y0) * t; });
     });
     sim.alpha(.35).restart();
     placeLabels();
-    return { R, H: maxH };
+    return { w, h };
+  }
+  function buildRing(f) {
+    const vis = new Set(visNodes.map(n => n.id));
+    // Voisines et confusions rangées ensemble par famille ; dans les fleurs, la tige d'une confusion est rouge
+    const conf = new Set(state.showSug ? f.sug : []);
+    const nbs = [...new Set([...f.nb, ...conf])].map(i => byId.get(i)).filter(n => n && vis.has(n.id));
+    const groups = typeKeys.map(t => ({ label: TYPES[t].label, color: TYPES[t].color, nodes: nbs.filter(n => n.type === t).sort(byName) })).filter(g => g.nodes.length);
+    return layoutIso(f.x, f.y, groups, f, false, conf);
   }
   function paint() { if (nodeSel) nodeSel.select(".mk").attr("fill", color).attr("stroke", color); }
 
@@ -355,7 +397,7 @@ function init(G) {
     const circles = visNodes.map(n => ({ id: n.id, b: [n.x - rad(n), n.y - rad(n), n.x + rad(n), n.y + rad(n)] }));
     const onCircle = (b, id, only) => circles.some(c => c.id !== id && (!only || only.has(c.id)) && b[0] < c.b[2] && b[2] > c.b[0] && b[1] < c.b[3] && b[3] > c.b[1]);
     const txt = nodeSel.select("text");
-    if (state.focus && state.ring) { txt.style("display", d => d.ring ? null : "none"); placeLabels(); return; }
+    if (state.ring) { txt.style("display", d => d.ring ? null : "none"); placeLabels(); return; }
     // Dézoom maximal : aucun nom, la carte se lit comme une forme
     if (k < .2) { txt.style("display", "none"); return; }
     const fs = 11 / k, h = fs * 1.2, gap = 3 / k;
@@ -379,6 +421,7 @@ function init(G) {
   sim.on("tick", () => {
     edgeSel.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
     nodeSel.attr("transform", d => `translate(${d.x},${d.y})`);
+    if (stems) stems.attr("x2", d => d.n.x).attr("y2", d => d.n.y);
     scheduleLabels();
   });
   function fitNodes(ns, maxK = 1.4, dur = 600) {
@@ -400,6 +443,7 @@ function init(G) {
   }
   // 1 clic : on montre les liens sans toucher à la disposition. Double clic : la fiche est isolée en couronne.
   function select(id, center, ring = false) {
+    if (state.person && id) leavePerson();
     const wasRing = state.ring;
     state.focus = id; state.ring = !!(id && ring); if (id) setRov(id);
     releaseRing();
@@ -410,7 +454,7 @@ function init(G) {
       const v = viewArea();
       if (state.ring) {
         const box = buildRing(n);
-        const k = Math.max(.5, Math.min(1.5, v.H / (box.H + 120), v.W / (2 * box.R + 440)));
+        const k = Math.max(.25, Math.min(1.5, v.H / (box.h + 80), v.W / (box.w + 80)));
         svg.transition().duration(550).call(zoom.transform, d3.zoomIdentity.translate(v.cx - n.x * k, v.cy - n.y * k).scale(k));
       } else {
         if (wasRing) sim.alpha(.4).restart();
@@ -433,11 +477,7 @@ function init(G) {
   }
 
   // Lien vers un formulaire avec ses champs pré-remplis
-  function formUrl(base, params) {
-    const u = new URL(base);
-    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-    return u.toString();
-  }
+  const formUrl = U.formUrl;
 
   // ---------- Panneau (page complète)
   const panel = FULL ? $("panel") : null;
@@ -527,19 +567,8 @@ function init(G) {
   function renderFiche(j) {
     const n = byId.get(j.id);
     wBody.removeAttribute("aria-busy");
-    const props = j.props.length ? `<dl class="props">${j.props.map(p => `<dt>${esc(p.name)}</dt><dd>${p.html}</dd>`).join("")}</dl>` : "";
-    const body = j.html.trim() ? j.html : `<p class="muted">Pas de texte dans le corps de la fiche.</p>`;
-    const who = j.contributors && j.contributors.length ? j.contributors.map(c => typeof c === "string" ? esc(c)
-      : peopleById.has(c.id) ? `<button class="lnk" data-person="${esc(c.id)}">${esc(c.name)}</button>` : esc(c.name)).join(", ")
-      : `<span class="muted">Personne pour l'instant</span>`;
-    const F = G.forms || {}, here = location.origin + location.pathname + "#" + n.anchor;
-    const acts = [
-      F.erreur ? `<a class="btn" href="${esc(formUrl(F.erreur, { type: "Erreur", fiche: n.name, lien: here }))}" target="_blank" rel="noopener noreferrer">Signaler une erreur</a>` : "",
-      F.proposition ? `<a class="btn" href="${esc(formUrl(F.proposition, { liee: n.name }))}" target="_blank" rel="noopener noreferrer">Proposer une fiche liée</a>` : "",
-    ].join("");
-    const rs = RES.filter(r => r.liees.includes(n.id));
-    const resH = rs.length ? `<div class="contrib"><h4>Ressources</h4><ul class="links">${rs.map(r => `<li><span class="sw res"></span><button class="lnk" data-res="${esc(r.id)}">${esc(r.name)}</button></li>`).join("")}</ul></div>` : "";
-    wBody.innerHTML = props + body + resH + `<div class="contrib"><h4>Contributeurs</h4><p>${who}</p>${acts ? `<div class="acts">${acts}</div>` : ""}</div>`;
+    wBody.innerHTML = U.ficheHTML(D, n, j, { here: location.origin + location.pathname + "#" + n.anchor,
+      resItem: r => `<button class="lnk" data-res="${esc(r.id)}">${esc(r.name)}</button>` });
     wBody.scrollTop = 0;
     wBody.querySelectorAll("[data-id]").forEach(b => {
       if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true);
@@ -588,30 +617,14 @@ function init(G) {
     catch (e) { if (e.name !== "AbortError" && shown === "res:" + rid) render(null); }
   }
   // Fiche d'un contributeur : métier, liens et fiches relues (cliquables)
-  const peopleById = new Map((G.people || []).map(p => [p.id, p]));
+  const peopleById = D.people;
   function showPerson(pid) {
     const p = peopleById.get(pid); if (!p || !FULL) return;
     if (ficheReq) ficheReq.abort();
     shown = "person:" + pid; win.classList.remove("empty"); document.body.classList.add("hasfiche"); setCollapsed(false);
     wTitle.textContent = p.name; wSw.style.background = "var(--text-muted)"; delete wSw.dataset.s;
-    const fs = p.fiches.map(i => byId.get(i)).filter(Boolean)
-      .sort((a, b) => typeKeys.indexOf(a.type) - typeKeys.indexOf(b.type) || a.name.localeCompare(b.name, "fr"));
-    const ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
-    const photo = p.photo ? `<img class="pphoto" src="${esc(p.photo)}" alt="">` : `<span class="pphoto ini" aria-hidden="true">${esc(ini)}</span>`;
-    const since = p.since ? new Date(p.since).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }) : "";
-    const links = (p.links || []).map(l => `<a class="btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)} ↗</a>`).join("");
     wBody.removeAttribute("aria-busy");
-    wBody.innerHTML = `<div class="phead">${photo}<div>
-        <div class="pname">${esc(p.name)}</div>
-        ${p.job ? `<div class="muted">${esc(p.job)}</div>` : ""}
-        ${p.formation ? `<div class="muted" style="font-size:12.5px">Formation : ${esc(p.formation)}</div>` : ""}
-        ${(p.tags || []).length ? `<p class="ptags">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>` : ""}
-      </div></div>
-      ${links ? `<div class="acts">${links}</div>` : ""}
-      ${p.bio ? `<div class="pbio">${p.bio}</div>` : ""}
-      ${since ? `<p class="muted" style="font-size:12px">Contributeur depuis ${esc(since)}</p>` : ""}
-      <details class="pfiches"><summary>${fs.length} fiche${fs.length > 1 ? "s" : ""} relue${fs.length > 1 ? "s" : ""}</summary>
-        <ul class="links">${fs.map(n => item(n)).join("")}</ul></details>`;
+    wBody.innerHTML = U.personHTML(p) + U.relues(D, p, true);
     wBody.scrollTop = 0;
     wBody.querySelectorAll("[data-id]").forEach(b => { if (byId.has(b.dataset.id)) b.onclick = () => select(b.dataset.id, true); else b.replaceWith(...b.childNodes); });
   }
@@ -680,9 +693,38 @@ function init(G) {
     draggable(lw, "reseau-legend-pos");
   }
 
+  // ---------- Carte isolée sur un contributeur (embed.html?iso#p=<id>) : son avatar au centre,
+  // ses fiches autour, avec la même logique que la fiche isolée (couronne, ou fleurs par famille)
+  let gPerson = null;
+  function personHash() { const m = /^p=([\w-]+)$/.exec(location.hash.slice(1)); return m && peopleById.has(m[1]) ? m[1] : null; }
+  function leavePerson() { state.person = null; if (gPerson) gPerson.remove(); gPerson = null; }
+  function isoPerson(pid) {
+    const p = peopleById.get(pid); if (!p) return;
+    if (gPerson) gPerson.remove();
+    state.person = pid; state.focus = null; releaseRing(); state.ring = true;
+    update(); highlight();
+    const groups = typeKeys.map(t => ({ label: TYPES[t].label, color: TYPES[t].color, nodes: visNodes.filter(n => n.type === t).sort(byName) })).filter(g => g.nodes.length);
+    const box = layoutIso(0, 0, groups, null, true, null);
+    gPerson = root.append("g").attr("class", "person");
+    const R = 32, ini = p.name.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase();
+    gPerson.append("circle").attr("class", "pav").attr("r", R + 3);
+    if (p.photo) {
+      svg.select("defs#pdefs").remove();
+      svg.append("defs").attr("id", "pdefs").append("clipPath").attr("id", "pclip").append("circle").attr("r", R);
+      gPerson.append("image").attr("href", p.photo).attr("x", -R).attr("y", -R).attr("width", 2 * R).attr("height", 2 * R)
+        .attr("preserveAspectRatio", "xMidYMid slice").attr("clip-path", "url(#pclip)");
+    } else gPerson.append("text").attr("class", "pini").attr("dy", ".35em").attr("text-anchor", "middle").text(ini);
+    gPerson.append("text").attr("class", "pnm").attr("y", R + 20).attr("text-anchor", "middle").text(p.name);
+    const v = viewArea(), k = Math.max(.25, Math.min(1.3, v.H / (box.h + 80), v.W / (box.w + 80)));
+    svg.transition().duration(550).call(zoom.transform, d3.zoomIdentity.translate(v.cx, v.cy).scale(k));
+    labelVis(k);
+  }
+
   // ---------- Lancement
   if (MOB()) { document.body.classList.add("nopanel"); $("panelBtn").setAttribute("aria-expanded", false); }
-  if (LOCK) { const d0 = fromHash(location.hash.slice(1)); if (d0) { state.focus = d0; G.nodes.forEach(n => { n.x = 0; n.y = 0; }); } }
+  if (LOCK) { const d0 = fromHash(location.hash.slice(1)), p0 = personHash();
+    if (p0) state.person = p0; else if (d0) state.focus = d0;
+    if (p0 || d0) G.nodes.forEach(n => { n.x = 0; n.y = 0; }); }
   update(); renderPanel(); fitBar();
   if (document.fonts) document.fonts.ready.then(() => fitBar());
   sim.stop();
@@ -693,9 +735,10 @@ function init(G) {
   linkCap = .05;
   sim.on("tick")(); sim.alpha(.05).restart();
   fitNodes(visNodes, 1.2, 0);
-  addEventListener("resize", () => { fitBar(); if (LOCK && state.focus) select(state.focus, false, true); else if (!state.focus) fitNodes(visNodes, 1.2, 0); });
+  addEventListener("resize", () => { fitBar(); if (LOCK && state.person) isoPerson(state.person); else if (LOCK && state.focus) select(state.focus, false, true); else if (!state.focus) fitNodes(visNodes, 1.2, 0); });
   const deep = fromHash(location.hash.slice(1));
-  if (deep) select(deep, true, LOCK);
-  addEventListener("hashchange", () => { const d = fromHash(location.hash.slice(1)); if (d && d !== state.focus) select(d, true, LOCK); });
+  if (state.person) isoPerson(state.person); else if (deep) select(deep, true, LOCK);
+  addEventListener("hashchange", () => { const pp = LOCK && personHash(); if (pp) { if (pp !== state.person) isoPerson(pp); return; }
+    const d = fromHash(location.hash.slice(1)); if (d && d !== state.focus) select(d, true, LOCK); });
 }
 })();
