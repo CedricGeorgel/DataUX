@@ -1170,7 +1170,7 @@
   var msg = bar.querySelector(".msg");
   // Retour vers la ou les fiches DataUX dont est tirée la ressource (lues dans les données de la carte)
   var back = mk("span", "tb-back");
-  var backLink = function (href, label) { var a = mk("a", "tb-link"); a.href = href; a.textContent = label; return a; };
+  var backLink = function (href, label) { var a = mk("a", "tb-link"); a.href = href; a.target = "_top"; a.textContent = label; return a; };
   back.appendChild(backLink("../", "← DataUX"));
   bar.insertBefore(back, bar.firstChild);
   if (window.fetch) fetch("../data/graph.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (G) {

@@ -7,9 +7,11 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/nav.css">
 <link rel="stylesheet" href="assets/graph.css">
 </head>
 <body data-mode="full">
+<nav class="views" aria-label="Vues"><a href="./" aria-current="page">Carte</a><a href="fiches.html">Liste</a><a href="ressources.html">Ressources</a></nav>
 <div class="bar">
   <input id="q" type="search" placeholder="Chercher une fiche…" aria-label="Chercher une fiche" list="names">
   <datalist id="names"></datalist>
@@ -25,7 +27,6 @@
       </div>
     </div>
   </div>
-  <a class="btn" id="listBtn" href="fiches.html">Liste</a>
 </div>
 <div id="graph"><svg id="svg" role="group" aria-label="Carte des fiches. Flèches pour passer d’une fiche à l’autre, Entrée pour l’ouvrir."></svg></div>
 <button class="chev" id="panelBtn" aria-expanded="true" aria-controls="panel" aria-label="Masquer le panneau" title="Masquer le panneau"><svg class="tab" viewBox="0 0 29 64" width="29" height="64" aria-hidden="true"><path class="fill" d="M29 0A9 9 0 0 1 20 9H9.5A9 9 0 0 0 .5 18V46A9 9 0 0 0 9.5 55H20A9 9 0 0 1 29 64Z"/><path class="edge" d="M28.5 .5A8.5 8.5 0 0 1 20 9.5H9.5A9 9 0 0 0 .5 18.5V45.5A9 9 0 0 0 9.5 54.5H20A8.5 8.5 0 0 1 28.5 63"/></svg><svg class="ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>

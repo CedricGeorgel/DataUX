@@ -118,7 +118,7 @@ function init(G) {
   // Mobile : le panneau et la fiche deviennent des feuilles en bas d'écran
   const MOB = () => FULL && innerWidth <= 760;
   const sideW = () => !FULL || document.body.classList.contains("nopanel") || innerWidth <= 760 ? 0 : 360;
-  const topH = FULL ? 70 : 20;
+  const topH = FULL ? 112 : 20;
   // Zone libre de l'écran : sans la barre, le panneau et la fenêtre de fiche
   function viewArea() {
     let x0 = 0, x1 = innerWidth - sideW(), y0 = topH, y1 = innerHeight;
@@ -472,7 +472,6 @@ function init(G) {
       const when = new Date(G.generated).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
       panel.innerHTML = grab() + `<h1>Réseau des fiches</h1>
         <div class="stat"><div><b>${G.nodes.length}</b><span class="muted">fiches</span></div><div><b>${G.edges.length}</b><span class="muted">liens</span></div><div><b>${G.conf.length}</b><span class="muted">confusions</span></div><div><b>${iso.length}</b><span class="muted">isolées</span></div></div>
-        <p><a class="lnk" href="fiches.html">Voir les ${G.nodes.length} fiches en cartes →</a></p>
         <h2>Les plaques tournantes</h2>
         <p class="muted">Les fiches qui relient le plus de notions.</p>
         <ul class="links">${hubs.map(n => item(n, ` <span class="muted">${n.deg}</span>`)).join("")}</ul>

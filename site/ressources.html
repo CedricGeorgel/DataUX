@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ressources · DataUX</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/nav.css">
+<link rel="stylesheet" href="assets/fiches.css">
+</head>
+<body class="res-page">
+<header class="fh">
+  <nav class="views" aria-label="Vues"><a href="./">Carte</a><a href="fiches.html">Liste</a><a href="ressources.html" aria-current="page">Ressources</a></nav>
+  <h1>Ressources</h1>
+  <label class="q"><span class="sr">Filtrer les ressources</span><input id="q" type="search" placeholder="Filtrer les ressources…" autocomplete="off"></label>
+  <p class="n" id="n" role="status"></p>
+</header>
+<main id="grid" class="grid" aria-label="Ressources"></main>
+<section id="split" class="split" hidden>
+  <article class="fiche" id="fiche" aria-live="polite"></article>
+  <div class="map tpl" id="tplBox"><iframe id="tpl" title="Aperçu du template"></iframe><div class="ext" id="ext" hidden></div></div>
+</section>
+<script src="assets/ressources.js"></script>
+</body>
+</html>
