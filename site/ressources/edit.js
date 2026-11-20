@@ -1100,7 +1100,7 @@
   function pzSet(name, hidden) {
     var z = pzZones[name]; if (!z) return;
     pzHide[name] = !!hidden; z.hidden = !!hidden;
-    var b = bar && bar.querySelector('[data-pz="' + name + '"]');
+    var b = document.querySelector('[data-pz="' + name + '"]');
     if (b) { b.textContent = (hidden ? "Afficher " : "Masquer ") + (name === "Bio" ? "la bio" : "le niveau"); b.setAttribute("aria-pressed", hidden ? "true" : "false"); }
   }
 
@@ -1153,10 +1153,13 @@
     '<button type="button" data-a="clear">Tout effacer</button>' +
     '<a class="tb-link" href="' + location.pathname + '?papier" target="_blank" rel="noopener">Version papier vierge ↗</a>' +
     '<span class="msg" role="status">Saisie gardée dans ce navigateur</span>';
+  // Persona : boutons sous la fiche, comme le bouton post-it
+  var pzBelow = persona && mk("div", "tb-below pz-below");
+  if (persona) { root.parentNode.insertBefore(pzBelow, root.nextSibling); }
   if (persona) ["Niveau", "Bio"].forEach(function (n) {
     if (!pzZones[n]) return;
-    var b = mk("button"); b.type = "button"; b.setAttribute("data-pz", n);
-    bar.insertBefore(b, bar.querySelector(".tb-link"));
+    var b = mk("button", "btn-note"); b.type = "button"; b.setAttribute("data-pz", n);
+    pzBelow.appendChild(b);
     b.addEventListener("click", function () { pzSet(n, !pzHide[n]); save(); });
     pzSet(n, !!pzHide[n]);
   });
