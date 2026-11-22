@@ -6,7 +6,7 @@ a{color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* En-tête et filtres */
-.fh{max-width:1280px;margin:0 auto;padding:20px 24px 8px;display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
+.fh{padding:12px 12px 8px;display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center}
 .fh .views{grid-column:1/-1;justify-self:start;margin-bottom:6px}
 .fh .acts{margin:0}
 .fh h1{margin:0;font-size:22px;font-weight:600}
@@ -17,7 +17,7 @@ a{color:inherit}
 .n{grid-column:1/-1;margin:4px 0 0;color:var(--text-muted);font-size:12px}
 
 /* Cartes */
-.grid{max-width:1280px;margin:0 auto;padding:8px 24px 40px}
+.grid{padding:8px 12px 40px}
 .fam{margin:18px 0 0}
 .fam[hidden]{display:none}
 .fam h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:15px;font-weight:600}
@@ -55,9 +55,9 @@ body.split-on{overflow:hidden}
 .map iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
 
 @media (max-width:760px){
-  .fh{grid-template-columns:1fr;padding:16px}
+  .fh{grid-template-columns:1fr;padding:8px 8px 8px}
   .fh .search{width:100%}
-  .grid{padding:8px 16px 32px}
+  .grid{padding:8px 8px 32px}
   .cards{grid-template-columns:1fr 1fr}
   .split{grid-template-columns:1fr;grid-template-rows:55% 45%}
   .fiche{border-right:0;border-bottom:1px solid var(--line);padding:16px}
