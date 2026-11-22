@@ -596,10 +596,11 @@ function init(G) {
     win.classList.add("empty");
     // Un clic sur la barre de titre replie ou déplie. Après un glissement, on ne replie pas.
     win.querySelector(".whead").addEventListener("click", () => { if (win.dataset.moved) { win.dataset.moved = ""; return; } setCollapsed(!win.classList.contains("collapsed")); });
-    // La fiche se déplace en tirant sa barre de titre. Sa place est gardée pour la prochaine visite.
-    const fp = store.get("reseau-fiche-pos");
-    if (fp && innerWidth > 760) { win.style.left = Math.min(Math.max(0, fp.x), innerWidth - 120) + "px"; win.style.top = Math.min(Math.max(0, fp.y), innerHeight - 44) + "px"; }
-    draggable(win, "reseau-fiche-pos");
+    // La fiche se déplace en tirant sa barre de titre. À chaque ouverture de la page, elle repart sous la barre de recherche.
+    store.set("reseau-fiche-pos", null);
+    const bar = document.querySelector(".bar");
+    if (bar && innerWidth > 760) { win.style.left = "12px"; win.style.top = Math.round(bar.getBoundingClientRect().bottom + 8) + "px"; }
+    draggable(win);
     wIso.onclick = e => { e.stopPropagation(); if (state.focus) select(state.focus, false, !state.ring); };
     win.querySelector("[data-close]").onclick = e => { e.stopPropagation(); if (shown && /^(person|res):/.test(shown) && state.focus) { shown = null; loadFiche(state.focus); } else select(null); };
     swipe(win.querySelector(".whead"), d => { if (MOB()) setCollapsed(d > 0); });
@@ -632,7 +633,7 @@ function init(G) {
         el.style.left = x + "px"; el.style.top = y + "px"; el.style.bottom = "auto"; el.style.right = "auto";
       };
       const up = () => { head.removeEventListener("pointermove", move); head.removeEventListener("pointerup", up);
-        if (el.dataset.moved) store.set(key, { x: parseFloat(el.style.left), y: parseFloat(el.style.top) }); };
+        if (el.dataset.moved && key) store.set(key,{ x: parseFloat(el.style.left), y: parseFloat(el.style.top) }); };
       head.addEventListener("pointermove", move); head.addEventListener("pointerup", up);
     });
   }
